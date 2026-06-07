@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { subscribeToGame } from '@/lib/supabase';
 import { Game, ROLE_LABELS, ROLE_DESCRIPTIONS, ROLE_TAGS, Role } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 
-export default function AssignedPage() {
+function AssignedContent() {
   const params = useSearchParams();
   const router = useRouter();
   const gameId = params.get('gameId') ?? '';
@@ -66,7 +66,7 @@ export default function AssignedPage() {
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
         <p className="font-semibold mb-1">⏰ Remember: perishability rules</p>
         <ul className="list-disc list-inside space-y-1 text-xs">
-          <li>Any stock held for more than <strong>4 rounds</strong> expires automatically.</li>
+          <li>Any stock held for more than <strong>3 rounds</strong> expires automatically.</li>
           <li>Expired units cost <strong>$2/unit</strong> in wastage.</li>
           <li>Unfulfilled demand is <strong>lost</strong> — no backlog.</li>
           <li>Order wisely: over-ordering wastes money, under-ordering loses sales.</li>
@@ -77,5 +77,18 @@ export default function AssignedPage() {
         ⏳ Waiting for facilitator to start...
       </p>
     </div>
+  );
+}
+
+export default function AssignedPage() {
+  return (
+    <Suspense fallback={
+      <div className="text-center mt-20 text-gray-400">
+        <div className="text-4xl mb-3">⏳</div>
+        <p>Loading...</p>
+      </div>
+    }>
+      <AssignedContent />
+    </Suspense>
   );
 }
