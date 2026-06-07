@@ -43,7 +43,7 @@ export default function AdminGamePage() {
     try {
       if (state.phase === 'ordering') {
         // Force-process round with current pending orders (fill missing with 0)
-        const stored = (state as GameState & { pendingOrders?: Record<Role, number> }).pendingOrders ?? {};
+        const stored = ((state as GameState & { pendingOrders?: Partial<Record<Role, number>> }).pendingOrders ?? {}) as Partial<Record<Role, number>>;
         const orders: Record<Role, number> = {
           retailer: stored.retailer ?? 0,
           wholesaler: stored.wholesaler ?? 0,
