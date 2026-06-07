@@ -27,7 +27,8 @@ function toArray<T>(value: unknown): T[] {
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 export function createInitialGameState(config: GameConfig): GameState {
-  const seed = Math.round((config.customerDemandMin + config.customerDemandMax) / 2);
+  // Seed the pipeline with round-1 demand so players don't start empty
+  const seed = config.demandSchedule?.[0] ?? 4;
   const roles = {} as Record<Role, RoleState>;
 
   for (const role of ROLES) {
@@ -113,7 +114,7 @@ export function processRound(
   const newRound = state.currentRound + 1;
   const newRoles = { ...state.roles };
 
-  const customerDemand = getCustomerDemand(config);
+  const customerDemand = getDemandForRound(config, newRound);
 
   // Helper to read pipeline (may be serialized as object by Supabase JSONB)
   const pipe = (role: Role): number[] => toArray<number>(state.roles[role]?.shipmentPipeline);
@@ -235,9 +236,20 @@ export function getTotalWastage(roles: Record<Role, RoleState>): number {
   );
 }
 
+/**
+ * Return the scheduled customer demand for a given round (1-indexed).
+ * If round exceeds the schedule length, the last value is repeated.
+ */
+export function getDemandForRound(config: GameConfig, round: number): number {
+  const schedule = config.demandSchedule;
+  if (!schedule || schedule.length === 0) return 4;
+  const idx = Math.min(round - 1, schedule.length - 1);
+  return schedule[idx];
+}
+
+/** @deprecated use getDemandForRound — kept for backward compatibility */
 export function getCustomerDemand(config: GameConfig): number {
-  const range = config.customerDemandMax - config.customerDemandMin;
-  return config.customerDemandMin + Math.floor(Math.random() * (range + 1));
+  return getDemandForRound(config, 1);
 }
 
 /**
@@ -246,7 +258,10 @@ export function getCustomerDemand(config: GameConfig): number {
  * where target_stock is 2x the average demand to buffer for expiry risk.
  */
 export function getSuggestedOrder(rs: RoleState, config: GameConfig): number {
-  const avgDemand = Math.round((config.customerDemandMin + config.customerDemandMax) / 2);
+  const schedule = config.demandSchedule ?? [];
+  const avgDemand = schedule.length > 0
+    ? Math.round(schedule.reduce((s, v) => s + v, 0) / schedule.length)
+    : 10;
   const targetStock = avgDemand * 2;
   const suggestion = Math.max(0, rs.incomingOrder + (targetStock - rs.totalInventory));
   return suggestion;

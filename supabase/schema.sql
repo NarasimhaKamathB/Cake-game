@@ -20,12 +20,19 @@ CREATE INDEX IF NOT EXISTS games_code_idx ON public.games (code);
 CREATE TABLE IF NOT EXISTS public.session_settings (
   id                  INT     PRIMARY KEY DEFAULT 1,
   registration_open   BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Facilitator-configured game parameters applied to all new games.
+  -- Null means use the application DEFAULT_CONFIG.
+  game_config         JSONB   DEFAULT NULL,
   CONSTRAINT single_row CHECK (id = 1)
 );
 
 INSERT INTO public.session_settings (id, registration_open)
 VALUES (1, TRUE)
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Migration: add game_config if upgrading an existing schema ───────────────
+-- Run this block if the table already exists without the game_config column:
+-- ALTER TABLE public.session_settings ADD COLUMN IF NOT EXISTS game_config JSONB DEFAULT NULL;
 
 -- ── Row-Level Security (disable for simplicity; tighten for production) ──────
 ALTER TABLE public.games DISABLE ROW LEVEL SECURITY;

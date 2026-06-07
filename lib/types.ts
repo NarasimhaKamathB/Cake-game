@@ -78,18 +78,22 @@ export interface GameConfig {
   wastageCostPerUnit: number;   // $ per expired unit
   expiryWeeks: number;          // shelf life in rounds
   startingInventory: number;
-  customerDemandMin: number;
-  customerDemandMax: number;
+  /**
+   * Per-round customer demand schedule.
+   * If the game runs longer than the array, the last value repeats.
+   * Configurable by the facilitator before each session.
+   */
+  demandSchedule: number[];
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
-  totalRounds: 13,
+  totalRounds: 20,
   holdingCostPerUnit: 0.5,
   wastageCostPerUnit: 2.0,
-  expiryWeeks: 4,
+  expiryWeeks: 3,
   startingInventory: 12,
-  customerDemandMin: 1,
-  customerDemandMax: 100,
+  // Ramp: 4,4 → +4/wk until 20 → hold at 20
+  demandSchedule: [4, 4, 8, 12, 16, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
 };
 
 // ─── Player ───────────────────────────────────────────────────────────────────
@@ -121,6 +125,8 @@ export interface Game {
 
 export interface SessionSettings {
   registrationOpen: boolean;
+  /** Facilitator-configured game parameters applied to all new games this session. */
+  gameConfig?: GameConfig;
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────

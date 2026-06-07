@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { subscribeToGame, updateGameState, updateFullGameState } from '@/lib/supabase';
+import { subscribeToGame, getGame, updateGameState, updateFullGameState } from '@/lib/supabase';
 import { processRound } from '@/lib/gameLogic';
 import {
   Game, Role, ROLES, ROLE_LABELS, GameState,
@@ -33,9 +33,13 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!gameId) return;
+    // Fetch initial state immediately so the page doesn't hang on first load
+    getGame(gameId).then(g => {
+      if (g) setGame(g);
+    });
+    // Then keep in sync via real-time
     const unsub = subscribeToGame(gameId, g => {
-      setGame(g);
-      // Reset submission state when a new ordering round starts
+      if (g) setGame(g);
       if (g?.state.phase === 'ordering') setSubmitted(false);
     });
     return unsub;
@@ -140,23 +144,35 @@ export default function GamePage() {
         </Badge>
       </div>
 
-      {/* Role panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {ROLES.map(role => {
-          const rs = state.roles[role];
-          if (!rs) return null;
-          return (
-            <RolePanel
-              key={role}
-              role={role}
-              rs={rs}
-              config={config}
-              currentRound={state.currentRound}
-              isOwnRole={role === myRole}
-            />
-          );
-        })}
-      </div>
+      {/* Role panel — player sees only their own echelon */}
+      {myRole && state.roles[myRole] && (
+        <RolePanel
+          role={myRole}
+          rs={state.roles[myRole]}
+          config={config}
+          currentRound={state.currentRound}
+          isOwnRole={true}
+        />
+      )}
+      {!myRole && (
+        // Observer / admin fallback — show all roles
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {ROLES.map(role => {
+            const rs = state.roles[role];
+            if (!rs) return null;
+            return (
+              <RolePanel
+                key={role}
+                role={role}
+                rs={rs}
+                config={config}
+                currentRound={state.currentRound}
+                isOwnRole={false}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* Order input */}
       {myRole && myRs && !submitted && (

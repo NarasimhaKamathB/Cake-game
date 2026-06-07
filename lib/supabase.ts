@@ -154,12 +154,17 @@ export async function getSessionSettings(): Promise<SessionSettings> {
     .select('*')
     .eq('id', 1)
     .single();
-  return data ? { registrationOpen: data.registration_open } : { registrationOpen: true };
+  if (!data) return { registrationOpen: true };
+  return {
+    registrationOpen: data.registration_open,
+    gameConfig: data.game_config ?? undefined,
+  };
 }
 
 export async function updateSessionSettings(settings: Partial<SessionSettings>): Promise<void> {
   const patch: Record<string, unknown> = {};
   if (settings.registrationOpen !== undefined) patch.registration_open = settings.registrationOpen;
+  if (settings.gameConfig !== undefined) patch.game_config = settings.gameConfig;
   await supabase.from('session_settings').upsert({ id: 1, ...patch });
 }
 
@@ -297,16 +302,18 @@ export async function autoAssignPlayer(email: string): Promise<{
     return { playerId, gameId: game.id, role: availableRole, teamName, teamNumber };
   }
 
-  // Create a new team game
+  // Create a new team game using the facilitator's configured settings
   const teamNumber = games.length + 1;
   const teamName = TEAM_NAMES[(teamNumber - 1) % TEAM_NAMES.length];
-  return createTeamGame(trimmed, teamName, teamNumber);
+  const activeConfig = session.gameConfig ?? DEFAULT_CONFIG;
+  return createTeamGame(trimmed, teamName, teamNumber, activeConfig);
 }
 
 async function createTeamGame(
   email: string,
   teamName: string,
   teamNumber: number,
+  config: GameConfig = DEFAULT_CONFIG,
 ): Promise<{ playerId: string; gameId: string; role: Role; teamName: string; teamNumber: number }> {
   const gameId = 'team_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const code = generateGameCode();
@@ -328,9 +335,9 @@ async function createTeamGame(
     id: gameId,
     code,
     hostId: playerId,
-    config: DEFAULT_CONFIG,
+    config,
     players: { [playerId]: player },
-    state: createInitialGameState(DEFAULT_CONFIG),
+    state: createInitialGameState(config),
     createdAt: Date.now(),
   };
 
