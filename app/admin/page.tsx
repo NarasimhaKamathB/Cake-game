@@ -31,6 +31,7 @@ function ConfigEditor({
   const [expiryWeeks, setExpiryWeeks]   = useState(String(current.expiryWeeks));
   const [holdingCost, setHoldingCost]   = useState(String(current.holdingCostPerUnit));
   const [wastageCost, setWastageCost]   = useState(String(current.wastageCostPerUnit));
+  const [lostCost, setLostCost]         = useState(String(current.lostSalesCostPerUnit ?? 4));
   const [startInv, setStartInv]         = useState(String(current.startingInventory));
   const [scheduleStr, setScheduleStr]   = useState(current.demandSchedule.join(', '));
 
@@ -40,6 +41,7 @@ function ConfigEditor({
     setExpiryWeeks(String(current.expiryWeeks));
     setHoldingCost(String(current.holdingCostPerUnit));
     setWastageCost(String(current.wastageCostPerUnit));
+    setLostCost(String(current.lostSalesCostPerUnit ?? 4));
     setStartInv(String(current.startingInventory));
     setScheduleStr(current.demandSchedule.join(', '));
   }, [current]);
@@ -61,12 +63,13 @@ function ConfigEditor({
     const schedule = parseSchedule(scheduleStr);
     if (schedule.length === 0) return alert('Enter at least one demand value.');
     const cfg: GameConfig = {
-      totalRounds:        Math.max(1, parseInt(totalRounds) || DEFAULT_CONFIG.totalRounds),
-      expiryWeeks:        Math.max(1, parseInt(expiryWeeks) || DEFAULT_CONFIG.expiryWeeks),
-      holdingCostPerUnit: Math.max(0, parseFloat(holdingCost) || DEFAULT_CONFIG.holdingCostPerUnit),
-      wastageCostPerUnit: Math.max(0, parseFloat(wastageCost) || DEFAULT_CONFIG.wastageCostPerUnit),
-      startingInventory:  Math.max(0, parseInt(startInv) || DEFAULT_CONFIG.startingInventory),
-      demandSchedule:     schedule,
+      totalRounds:           Math.max(1, parseInt(totalRounds) || DEFAULT_CONFIG.totalRounds),
+      expiryWeeks:           Math.max(1, parseInt(expiryWeeks) || DEFAULT_CONFIG.expiryWeeks),
+      holdingCostPerUnit:    Math.max(0, parseFloat(holdingCost) || DEFAULT_CONFIG.holdingCostPerUnit),
+      wastageCostPerUnit:    Math.max(0, parseFloat(wastageCost) || DEFAULT_CONFIG.wastageCostPerUnit),
+      lostSalesCostPerUnit:  Math.max(0, parseFloat(lostCost)   || DEFAULT_CONFIG.lostSalesCostPerUnit),
+      startingInventory:     Math.max(0, parseInt(startInv)     || DEFAULT_CONFIG.startingInventory),
+      demandSchedule:        schedule,
     };
     setSaving(true);
     try {
@@ -153,6 +156,16 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
+
+            {/* Lost sales cost */}
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-gray-600">Lost Sales Cost ($/unit unmet)</span>
+              <input
+                type="number" min={0} step={0.5} value={lostCost}
+                onChange={e => setLostCost(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
+              />
+            </label>
           </div>
 
           {/* Demand schedule */}
@@ -183,6 +196,7 @@ function ConfigEditor({
               setExpiryWeeks(String(DEFAULT_CONFIG.expiryWeeks));
               setHoldingCost(String(DEFAULT_CONFIG.holdingCostPerUnit));
               setWastageCost(String(DEFAULT_CONFIG.wastageCostPerUnit));
+              setLostCost(String(DEFAULT_CONFIG.lostSalesCostPerUnit));
               setStartInv(String(DEFAULT_CONFIG.startingInventory));
               setScheduleStr(DEFAULT_CONFIG.demandSchedule.join(', '));
             }}>

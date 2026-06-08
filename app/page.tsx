@@ -38,7 +38,7 @@ export default function HomePage() {
         <h2 className="text-3xl font-bold text-cake-700">Welcome to the Cake Game</h2>
         <p className="text-gray-500 mt-2">
           A perishable supply chain simulation. Manage your inventory carefully —
-          stock expires after <strong>4 weeks</strong>!
+          stock expires after <strong>3 weeks</strong>!
         </p>
       </div>
 
@@ -64,8 +64,8 @@ export default function HomePage() {
 
         <div className="mt-5 pt-5 border-t border-gray-100 space-y-2 text-xs text-gray-400">
           <p>🎭 You&apos;ll be auto-assigned a role: Manufacturer, Distributor, Wholesaler, or Retailer.</p>
-          <p>⏰ Inventory expires after 4 rounds. Wastage costs $2/unit.</p>
-          <p>📉 Unmet demand is lost — there&apos;s no backlog.</p>
+          <p>⏰ Inventory expires after 3 rounds. Wastage costs $2/unit.</p>
+          <p>📉 Unmet demand is lost — $4/unit penalty. No backlog.</p>
         </div>
       </div>
 

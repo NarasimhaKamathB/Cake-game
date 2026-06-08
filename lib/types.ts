@@ -42,6 +42,7 @@ export interface RoleState {
 
   roundHoldingCost: number;
   roundWastageCost: number;
+  roundLostSalesCost: number;
   roundCost: number;
   totalCost: number;
 
@@ -55,6 +56,7 @@ export interface RoleState {
   inventoryHistory: number[];   // totalInventory after each round
   wastageHistory: number[];
   lostSalesHistory: number[];
+  lostSalesCostHistory: number[];
   costHistory: number[];
   receivedHistory: number[];
   shippedHistory: number[];
@@ -74,9 +76,10 @@ export interface GameState {
 
 export interface GameConfig {
   totalRounds: number;
-  holdingCostPerUnit: number;   // $ per unit per round
-  wastageCostPerUnit: number;   // $ per expired unit
-  expiryWeeks: number;          // shelf life in rounds
+  holdingCostPerUnit: number;     // $ per unit held per round
+  wastageCostPerUnit: number;     // $ per expired unit
+  lostSalesCostPerUnit: number;   // $ per unit of unmet demand
+  expiryWeeks: number;            // shelf life in rounds
   startingInventory: number;
   /**
    * Per-round customer demand schedule.
@@ -90,6 +93,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   totalRounds: 20,
   holdingCostPerUnit: 0.5,
   wastageCostPerUnit: 2.0,
+  lostSalesCostPerUnit: 4.0,
   expiryWeeks: 3,
   startingInventory: 12,
   // Ramp: 4,4 → +4/wk until 20 → hold at 20
@@ -177,6 +181,7 @@ export const DEFAULT_ROLE_STATE: RoleState = {
   lostSales: 0,
   roundHoldingCost: 0,
   roundWastageCost: 0,
+  roundLostSalesCost: 0,
   roundCost: 0,
   totalCost: 0,
   orderPlaced: false,
@@ -185,6 +190,7 @@ export const DEFAULT_ROLE_STATE: RoleState = {
   inventoryHistory: [],
   wastageHistory: [],
   lostSalesHistory: [],
+  lostSalesCostHistory: [],
   costHistory: [],
   receivedHistory: [],
   shippedHistory: [],

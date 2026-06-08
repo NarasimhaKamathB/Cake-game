@@ -158,32 +158,35 @@ export function processRound(
 
     // 4. Compute costs
     const totalInventory = remaining.reduce((s, b) => s + b.quantity, 0);
-    const holdingCost = totalInventory * config.holdingCostPerUnit;
-    const wastageCost = wastedUnits * config.wastageCostPerUnit;
-    const roundCost = holdingCost + wastageCost;
+    const holdingCost   = totalInventory * config.holdingCostPerUnit;
+    const wastageCost   = wastedUnits    * config.wastageCostPerUnit;
+    const lostSalesCost = lostSales      * (config.lostSalesCostPerUnit ?? 4);
+    const roundCost     = holdingCost + wastageCost + lostSalesCost;
 
     // 5. Write back
-    rs.inventoryBuckets = remaining;
-    rs.totalInventory = totalInventory;
-    rs.outgoingShipment = shipped;
-    rs.lostSales = lostSales;
-    rs.wastedUnits = wastedUnits;
-    rs.roundHoldingCost = holdingCost;
-    rs.roundWastageCost = wastageCost;
-    rs.roundCost = roundCost;
-    rs.totalCost = (Number(rs.totalCost) || 0) + roundCost;
-    rs.outgoingOrder = orders[role];
-    rs.orderPlaced = false;
+    rs.inventoryBuckets   = remaining;
+    rs.totalInventory     = totalInventory;
+    rs.outgoingShipment   = shipped;
+    rs.lostSales          = lostSales;
+    rs.wastedUnits        = wastedUnits;
+    rs.roundHoldingCost   = holdingCost;
+    rs.roundWastageCost   = wastageCost;
+    rs.roundLostSalesCost = lostSalesCost;
+    rs.roundCost          = roundCost;
+    rs.totalCost          = (Number(rs.totalCost) || 0) + roundCost;
+    rs.outgoingOrder      = orders[role];
+    rs.orderPlaced        = false;
 
     // 6. Append to history
-    rs.orderHistory = [...(toArray<number>(rs.orderHistory)), orders[role]];
-    rs.inventoryHistory = [...(toArray<number>(rs.inventoryHistory)), totalInventory];
-    rs.wastageHistory = [...(toArray<number>(rs.wastageHistory)), wastedUnits];
-    rs.lostSalesHistory = [...(toArray<number>(rs.lostSalesHistory)), lostSales];
-    rs.costHistory = [...(toArray<number>(rs.costHistory)), roundCost];
-    rs.receivedHistory = [...(toArray<number>(rs.receivedHistory)), received[role]];
-    rs.shippedHistory = [...(toArray<number>(rs.shippedHistory)), shipped];
-    rs.demandHistory = [...(toArray<number>(rs.demandHistory)), incomingOrders[role]];
+    rs.orderHistory         = [...(toArray<number>(rs.orderHistory)),         orders[role]];
+    rs.inventoryHistory     = [...(toArray<number>(rs.inventoryHistory)),     totalInventory];
+    rs.wastageHistory       = [...(toArray<number>(rs.wastageHistory)),       wastedUnits];
+    rs.lostSalesHistory     = [...(toArray<number>(rs.lostSalesHistory)),     lostSales];
+    rs.lostSalesCostHistory = [...(toArray<number>(rs.lostSalesCostHistory)), lostSalesCost];
+    rs.costHistory          = [...(toArray<number>(rs.costHistory)),          roundCost];
+    rs.receivedHistory      = [...(toArray<number>(rs.receivedHistory)),      received[role]];
+    rs.shippedHistory       = [...(toArray<number>(rs.shippedHistory)),       shipped];
+    rs.demandHistory        = [...(toArray<number>(rs.demandHistory)),        incomingOrders[role]];
 
     newRoles[role] = rs;
   }

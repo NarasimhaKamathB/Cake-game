@@ -51,9 +51,16 @@ export function RolePanel({ role, rs, config, currentRound, isOwnRole }: RolePan
         </>
       )}
 
-      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-500">
-        <span>Total cost: <strong className="text-gray-700">${rs.totalCost.toFixed(2)}</strong></span>
-        <span>Holding: ${rs.roundHoldingCost.toFixed(2)} | Wastage: ${rs.roundWastageCost.toFixed(2)}</span>
+      <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>Total cost: <strong className="text-gray-700">${rs.totalCost.toFixed(2)}</strong></span>
+          <span className="text-gray-400">This round: ${rs.roundCost.toFixed(2)}</span>
+        </div>
+        <div className="flex gap-3 text-xs text-gray-400 flex-wrap">
+          <span>Holding: <strong>${rs.roundHoldingCost.toFixed(2)}</strong></span>
+          <span>Wastage: <strong className={rs.roundWastageCost > 0 ? 'text-red-500' : ''}>${rs.roundWastageCost.toFixed(2)}</strong></span>
+          <span>Lost sales: <strong className={rs.roundLostSalesCost > 0 ? 'text-amber-600' : ''}>${(rs.roundLostSalesCost ?? 0).toFixed(2)}</strong></span>
+        </div>
       </div>
     </Card>
   );
