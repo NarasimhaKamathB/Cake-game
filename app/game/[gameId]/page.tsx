@@ -139,7 +139,7 @@ export default function GamePage() {
       const playersDone = [...(game.state.playersDoneOrdering ?? [])];
       if (!playersDone.includes(myPlayerId)) playersDone.push(myPlayerId);
 
-      const storedOrders = (
+      const storedOrders: Partial<Record<Role, number>> = (
         (game.state as GameState & { pendingOrders?: Record<Role, number> }).pendingOrders ?? {}
       );
       const mergedOrders: Record<Role, number> = {
