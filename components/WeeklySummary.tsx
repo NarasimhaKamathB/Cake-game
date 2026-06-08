@@ -100,9 +100,9 @@ export function WeeklySummary({ state, config, myRole }: WeeklySummaryProps) {
         );
       })()}
 
-      {/* Team totals */}
-      <Card className="bg-cake-50">
-        {!myRole && (
+      {/* Team totals — admin view only */}
+      {!myRole && (
+        <Card className="bg-cake-50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-3">
             {ROLES.map(role => {
               const rs = state.roles[role];
@@ -116,14 +116,14 @@ export function WeeklySummary({ state, config, myRole }: WeeklySummaryProps) {
               );
             })}
           </div>
-        )}
-        <div className={`${!myRole ? 'border-t border-cake-200 pt-3' : ''} text-center`}>
-          <p className="text-xs text-gray-500">Cumulative team cost</p>
-          <p className="text-2xl font-bold text-cake-700">
-            ${ROLES.reduce((s, r) => s + (state.roles[r]?.totalCost ?? 0), 0).toFixed(2)}
-          </p>
-        </div>
-      </Card>
+          <div className="border-t border-cake-200 pt-3 text-center">
+            <p className="text-xs text-gray-500">Cumulative team cost</p>
+            <p className="text-2xl font-bold text-cake-700">
+              ${ROLES.reduce((s, r) => s + (state.roles[r]?.totalCost ?? 0), 0).toFixed(2)}
+            </p>
+          </div>
+        </Card>
+      )}
 
       <p className="text-xs text-gray-400 text-center">
         Holding: ${config.holdingCostPerUnit}/unit/round &nbsp;·&nbsp;
