@@ -13,47 +13,31 @@ export type GamePhase =
 
 // ─── Perishability ────────────────────────────────────────────────────────────
 
-/**
- * A batch of units that arrived at a node in a specific round.
- * Units expire after EXPIRY_WEEKS from arrivedRound.
- */
 export interface InventoryBucket {
-  arrivedRound: number; // which round this batch arrived
+  arrivedRound: number;
   quantity: number;
 }
 
 // ─── Per-role state ───────────────────────────────────────────────────────────
 
 export interface RoleState {
-  /** FIFO queue of inventory batches — oldest first. */
   inventoryBuckets: InventoryBucket[];
-  /** Computed sum of all bucket quantities (for display). */
   totalInventory: number;
-
   incomingOrder: number;
   outgoingOrder: number;
   incomingShipment: number;
   outgoingShipment: number;
-
-  /** Units that expired this round (held >= EXPIRY_WEEKS). */
   wastedUnits: number;
-  /** Demand that could not be filled — no backlog, just lost. */
   lostSales: number;
-
   roundHoldingCost: number;
   roundWastageCost: number;
   roundLostSalesCost: number;
   roundCost: number;
   totalCost: number;
-
   orderPlaced: boolean;
-
-  /** Shipment pipeline: goods in transit from upstream. [0] arrives next round. */
   shipmentPipeline: number[];
-
-  // History (one entry per round)
   orderHistory: number[];
-  inventoryHistory: number[];   // totalInventory after each round
+  inventoryHistory: number[];
   wastageHistory: number[];
   lostSalesHistory: number[];
   lostSalesCostHistory: number[];
@@ -70,22 +54,19 @@ export interface GameState {
   currentRound: number;
   roles: Record<Role, RoleState>;
   playersDoneOrdering: string[];
+  /** Epoch ms when the current ordering phase began — used for the 30s auto-submit timer. */
+  roundStartedAt?: number;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 export interface GameConfig {
   totalRounds: number;
-  holdingCostPerUnit: number;     // $ per unit held per round
-  wastageCostPerUnit: number;     // $ per expired unit
-  lostSalesCostPerUnit: number;   // $ per unit of unmet demand
-  expiryWeeks: number;            // shelf life in rounds
+  holdingCostPerUnit: number;
+  wastageCostPerUnit: number;
+  lostSalesCostPerUnit: number;
+  expiryWeeks: number;
   startingInventory: number;
-  /**
-   * Per-round customer demand schedule.
-   * If the game runs longer than the array, the last value repeats.
-   * Configurable by the facilitator before each session.
-   */
   demandSchedule: number[];
 }
 
@@ -96,7 +77,6 @@ export const DEFAULT_CONFIG: GameConfig = {
   lostSalesCostPerUnit: 4.0,
   expiryWeeks: 3,
   startingInventory: 12,
-  // Ramp: 4,4 → +4/wk until 20 → hold at 20
   demandSchedule: [4, 4, 8, 12, 16, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
 };
 
@@ -108,6 +88,8 @@ export interface Player {
   email: string;
   role: Role | null;
   isAdmin: boolean;
+  /** true for auto-generated bot players that fill empty slots */
+  isBot?: boolean;
   joinedAt: number;
   teamName?: string;
   teamNumber?: number;
@@ -129,7 +111,6 @@ export interface Game {
 
 export interface SessionSettings {
   registrationOpen: boolean;
-  /** Facilitator-configured game parameters applied to all new games this session. */
   gameConfig?: GameConfig;
 }
 
@@ -153,7 +134,7 @@ export const ROLE_TAGS: Record<Role, string> = {
   retailer: 'End consumer sales',
   wholesaler: 'Regional supply',
   distributor: 'Bulk distribution',
-  manufacturer: 'Raw → Finished goods',
+  manufacturer: 'Raw => Finished goods',
 };
 
 export const UPSTREAM_ROLE: Partial<Record<Role, Role>> = {

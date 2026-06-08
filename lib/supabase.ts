@@ -7,6 +7,8 @@ import {
   Role,
   SessionSettings,
   DEFAULT_CONFIG,
+  ROLES,
+  ROLE_LABELS,
 } from './types';
 import { generateGameCode, createInitialGameState } from './gameLogic';
 
@@ -190,11 +192,60 @@ export function subscribeToSessionSettings(
 
 // ─── Admin actions ────────────────────────────────────────────────────────────
 
+/**
+ * Fill any unfilled roles in a game with bot players.
+ * Bots are named "Bot (Role)" and have isBot: true.
+ */
+export async function autoFillBotPlayers(gameId: string): Promise<void> {
+  const game = await getGame(gameId);
+  if (!game) return;
+
+  const usedRoles = new Set(
+    Object.values(game.players)
+      .map(p => p.role as Role)
+      .filter(Boolean),
+  );
+  const missingRoles = ROLES.filter(r => !usedRoles.has(r));
+  if (missingRoles.length === 0) return;
+
+  const firstPlayer = Object.values(game.players)[0];
+  const newPlayers = { ...game.players };
+
+  for (const role of missingRoles) {
+    const botId = `bot_${role}`;
+    const botPlayer: Player = {
+      id: botId,
+      name: `Bot (${ROLE_LABELS[role]})`,
+      email: `bot_${role}@system`,
+      role,
+      isBot: true,
+      isAdmin: false,
+      joinedAt: Date.now(),
+      teamName: firstPlayer?.teamName ?? '',
+      teamNumber: firstPlayer?.teamNumber ?? 1,
+    };
+    newPlayers[botId] = botPlayer;
+  }
+
+  const { error } = await supabase
+    .from('games')
+    .update({ players: newPlayers })
+    .eq('id', gameId);
+  if (error) throw new Error(error.message);
+}
+
 export async function startAllGames(): Promise<void> {
   const games = await getAllGames();
   const preGame = games.filter(g => ['lobby', 'onboarding'].includes(g.state?.phase));
+
   await Promise.all(
-    preGame.map(g => updateGameState(g.id, { phase: 'ordering' })),
+    preGame.map(async g => {
+      // Fill any empty role slots with bots first
+      await autoFillBotPlayers(g.id);
+      // Then transition to ordering with a round-start timestamp
+      const roundStartedAt = Date.now();
+      await updateGameState(g.id, { phase: 'ordering', roundStartedAt });
+    }),
   );
 }
 
@@ -271,21 +322,26 @@ export async function autoAssignPlayer(email: string): Promise<{
     throw new Error('Registration is currently closed. Contact your session organiser.');
   }
 
-  // Find a lobby game with an open slot
+  // Find a lobby game with an open human slot (ignore bot slots)
   const openSlots = games
     .filter(g => g.state?.phase === 'lobby')
-    .map(g => ({ game: g, playerCount: Object.keys(g.players ?? {}).length }))
+    .map(g => {
+      const humanPlayers = Object.values(g.players ?? {}).filter(p => !p.isBot);
+      return { game: g, playerCount: humanPlayers.length };
+    })
     .filter(({ playerCount }) => playerCount < 4)
     .sort((a, b) => b.playerCount - a.playerCount);
 
   if (openSlots.length > 0) {
     const { game } = openSlots[0];
-    const usedRoles = Object.values(game.players ?? {}).map(p => p.role as Role);
+    const usedRoles = Object.values(game.players ?? {})
+      .filter(p => !p.isBot)
+      .map(p => p.role as Role);
     const availableRole = ROLE_ORDER.find(r => !usedRoles.includes(r))!;
     const playerId = trimmed.replace(/[^a-zA-Z0-9]/g, '_');
-    const firstPlayer = Object.values(game.players ?? {})[0];
-    const teamName = firstPlayer?.teamName ?? '';
-    const teamNumber = firstPlayer?.teamNumber ?? 1;
+    const firstHuman = Object.values(game.players ?? {}).find(p => !p.isBot);
+    const teamName = firstHuman?.teamName ?? '';
+    const teamNumber = firstHuman?.teamNumber ?? 1;
 
     const player: Player = {
       id: playerId,

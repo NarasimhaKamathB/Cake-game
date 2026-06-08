@@ -35,7 +35,6 @@ function ConfigEditor({
   const [startInv, setStartInv]         = useState(String(current.startingInventory));
   const [scheduleStr, setScheduleStr]   = useState(current.demandSchedule.join(', '));
 
-  // keep form in sync when upstream changes (e.g. first load)
   useEffect(() => {
     setTotalRounds(String(current.totalRounds));
     setExpiryWeeks(String(current.expiryWeeks));
@@ -55,7 +54,7 @@ function ConfigEditor({
     for (let i = 1; i <= Math.min(rounds, 6); i++) {
       preview.push(schedule[Math.min(i - 1, schedule.length - 1)]);
     }
-    if (rounds > 6) preview.push(-1); // sentinel for "..."
+    if (rounds > 6) preview.push(-1);
     return preview.map((v, i) => v === -1 ? '…' : `Wk${i + 1}:${v}`).join(' → ');
   }
 
@@ -107,7 +106,6 @@ function ConfigEditor({
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {/* Total weeks */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Total Weeks</span>
               <input
@@ -116,8 +114,6 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
-
-            {/* Expiry weeks */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Expiry Weeks (shelf life)</span>
               <input
@@ -126,8 +122,6 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
-
-            {/* Starting inventory */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Starting Inventory (units)</span>
               <input
@@ -136,8 +130,6 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
-
-            {/* Holding cost */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Holding Cost ($/unit/wk)</span>
               <input
@@ -146,8 +138,6 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
-
-            {/* Wastage cost */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Wastage Cost ($/expired unit)</span>
               <input
@@ -156,8 +146,6 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
-
-            {/* Lost sales cost */}
             <label className="space-y-1">
               <span className="text-xs font-medium text-gray-600">Lost Sales Cost ($/unit unmet)</span>
               <input
@@ -168,7 +156,6 @@ function ConfigEditor({
             </label>
           </div>
 
-          {/* Demand schedule */}
           <label className="block space-y-1">
             <span className="text-xs font-medium text-gray-600">
               Customer Demand Schedule (comma-separated, last value repeats)
@@ -209,17 +196,85 @@ function ConfigEditor({
   );
 }
 
+// ─── Leaderboard ──────────────────────────────────────────────────────────────
+
+function Leaderboard({ games }: { games: Game[] }) {
+  const active = games.filter(g => g.state.currentRound > 0);
+  if (active.length === 0) return null;
+
+  function toArr(v: unknown): number[] {
+    if (Array.isArray(v)) return v as number[];
+    if (v && typeof v === 'object') return Object.values(v) as number[];
+    return [];
+  }
+
+  const ranked = [...active].sort((a, b) => {
+    const costA = ROLES.reduce((s, r) => s + (a.state.roles?.[r]?.totalCost ?? 0), 0);
+    const costB = ROLES.reduce((s, r) => s + (b.state.roles?.[r]?.totalCost ?? 0), 0);
+    return costA - costB;
+  });
+
+  return (
+    <Card>
+      <p className="font-semibold text-cake-700 mb-3">🏆 Leaderboard</p>
+      <div className="space-y-2">
+        {ranked.map((game, idx) => {
+          const players  = Object.values(game.players ?? {});
+          const teamName = players.find(p => !p.isBot)?.teamName ?? game.id;
+          const totalCost = ROLES.reduce((s, r) => s + (game.state.roles?.[r]?.totalCost ?? 0), 0);
+          const totalWasted = ROLES.reduce(
+            (s, r) => s + toArr(game.state.roles?.[r]?.wastageHistory).reduce((a: number, v: number) => a + v, 0),
+            0,
+          );
+          const totalLost = ROLES.reduce(
+            (s, r) => s + toArr(game.state.roles?.[r]?.lostSalesHistory).reduce((a: number, v: number) => a + v, 0),
+            0,
+          );
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+
+          return (
+            <div
+              key={game.id}
+              className={`flex items-center gap-3 p-3 rounded-xl border ${
+                idx === 0
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-gray-50 border-gray-100'
+              }`}
+            >
+              <span className="text-xl w-8 text-center">{medal}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-gray-800 truncate">{teamName}</p>
+                <p className="text-xs text-gray-500">
+                  Round {game.state.currentRound}/{game.config.totalRounds}
+                  {' · '}
+                  <span className="text-red-500">{totalWasted} expired</span>
+                  {' · '}
+                  <span className="text-amber-500">{totalLost} lost sales</span>
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-bold text-cake-700">${totalCost.toFixed(2)}</p>
+                <p className="text-xs text-gray-400">team cost</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames]     = useState<Game[]>([]);
   const [session, setSession] = useState<SessionSettings>({ registrationOpen: true });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getAllGames().then(setGames);
-    const unsubGames    = subscribeToAllGames(setGames);
-    const unsubSession  = subscribeToSessionSettings(setSession);
+    const unsubGames   = subscribeToAllGames(setGames);
+    const unsubSession = subscribeToSessionSettings(setSession);
     return () => { unsubGames(); unsubSession(); };
   }, []);
 
@@ -242,9 +297,9 @@ export default function AdminPage() {
     await updateSessionSettings({ gameConfig: cfg });
   }
 
-  const activeConfig = session.gameConfig ?? DEFAULT_CONFIG;
-  const totalPlayers = games.reduce((s, g) => s + Object.keys(g.players ?? {}).length, 0);
-  const activeGames  = games.filter(g => !['ended', 'lobby'].includes(g.state?.phase)).length;
+  const activeConfig  = session.gameConfig ?? DEFAULT_CONFIG;
+  const totalPlayers  = games.reduce((s, g) => s + Object.values(g.players ?? {}).filter(p => !p.isBot).length, 0);
+  const activeGames   = games.filter(g => !['ended', 'lobby'].includes(g.state?.phase)).length;
 
   return (
     <div className="space-y-6">
@@ -273,7 +328,7 @@ export default function AdminPage() {
           <p className="text-3xl font-bold text-cake-700">{games.length}</p>
         </Card>
         <Card className="text-center">
-          <p className="text-xs text-gray-400">Players</p>
+          <p className="text-xs text-gray-400">Human Players</p>
           <p className="text-3xl font-bold text-cake-700">{totalPlayers}</p>
         </Card>
         <Card className="text-center">
@@ -291,6 +346,9 @@ export default function AdminPage() {
         Registration is currently <strong>{session.registrationOpen ? 'OPEN' : 'CLOSED'}</strong>.
         {!session.registrationOpen && ' New players cannot join.'}
       </div>
+
+      {/* Leaderboard */}
+      <Leaderboard games={games} />
 
       {/* Config editor */}
       <ConfigEditor current={activeConfig} onSave={handleSaveConfig} />
@@ -319,31 +377,43 @@ function GameRow({ game }: { game: Game }) {
   const { state, config } = game;
 
   const phaseColor: Record<string, string> = {
-    lobby: 'info',
-    onboarding: 'info',
-    ordering: 'warning',
-    processing: 'warning',
-    summary: 'default',
-    ended: 'success',
+    lobby: 'info', onboarding: 'info', ordering: 'warning',
+    processing: 'warning', summary: 'default', ended: 'success',
   };
+
+  function toArr(v: unknown): number[] {
+    if (Array.isArray(v)) return v as number[];
+    if (v && typeof v === 'object') return Object.values(v) as number[];
+    return [];
+  }
 
   async function advance(phase: string) {
     setLoading(true);
-    try { await updateGameState(game.id, { phase: phase as Game['state']['phase'] }); }
-    finally { setLoading(false); }
+    try {
+      const extra = phase === 'ordering' ? { roundStartedAt: Date.now() } : {};
+      await updateGameState(game.id, {
+        phase: phase as Game['state']['phase'],
+        ...extra,
+      });
+    } finally { setLoading(false); }
   }
 
   const totalWasted = ROLES.reduce(
-    (s, r) => s + (state.roles?.[r]?.wastageHistory ?? []).reduce((a: number, v: number) => a + v, 0),
+    (s, r) => s + toArr(state.roles?.[r]?.wastageHistory).reduce((a: number, v: number) => a + v, 0),
     0,
   );
+
+  const humanPlayers = players.filter(p => !p.isBot);
+  const botCount = players.length - humanPlayers.length;
 
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-bold text-gray-800">{players[0]?.teamName ?? game.id}</span>
+            <span className="font-bold text-gray-800">
+              {humanPlayers[0]?.teamName ?? game.id}
+            </span>
             <Badge variant={phaseColor[state?.phase] as 'default' | 'info' | 'warning' | 'success' | 'danger' ?? 'default'}>
               {state?.phase}
             </Badge>
@@ -351,6 +421,9 @@ function GameRow({ game }: { game: Game }) {
               Round {state?.currentRound}/{config?.totalRounds}
               {config?.expiryWeeks && (
                 <span className="ml-2 text-cake-500">{config.expiryWeeks}w expiry</span>
+              )}
+              {botCount > 0 && (
+                <span className="ml-2 text-gray-400">🤖 {botCount} bot{botCount > 1 ? 's' : ''}</span>
               )}
             </span>
           </div>
@@ -362,7 +435,9 @@ function GameRow({ game }: { game: Game }) {
               return (
                 <span key={role} className="text-xs bg-gray-100 rounded px-2 py-0.5">
                   <span className="text-gray-500">{ROLE_LABELS[role as Role]}: </span>
-                  <span className="font-medium">{p ? p.name : '—'}</span>
+                  <span className={`font-medium ${p?.isBot ? 'text-gray-400' : ''}`}>
+                    {p ? (p.isBot ? '🤖 Bot' : p.name) : '—'}
+                  </span>
                 </span>
               );
             })}
@@ -394,7 +469,10 @@ function GameRow({ game }: { game: Game }) {
             <Button size="sm" variant="ghost">👁 Watch</Button>
           </a>
           <Button size="sm" variant="ghost"
-            onClick={async () => { setLoading(true); try { await resetGameValues(game.id); } finally { setLoading(false); } }}
+            onClick={async () => {
+              setLoading(true);
+              try { await resetGameValues(game.id); } finally { setLoading(false); }
+            }}
             disabled={loading}
           >
             Reset
