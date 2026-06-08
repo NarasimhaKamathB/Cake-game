@@ -139,9 +139,8 @@ export default function GamePage() {
       const playersDone = [...(game.state.playersDoneOrdering ?? [])];
       if (!playersDone.includes(myPlayerId)) playersDone.push(myPlayerId);
 
-      const storedOrders: Partial<Record<Role, number>> = (
-        (game.state as GameState & { pendingOrders?: Record<Role, number> }).pendingOrders ?? {}
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const storedOrders = ((game.state as any).pendingOrders ?? {}) as Partial<Record<Role, number>>;
       const mergedOrders: Record<Role, number> = {
         retailer: 0, wholesaler: 0, distributor: 0, manufacturer: 0,
         ...storedOrders,
