@@ -32,12 +32,25 @@ export function createInitialGameState(config: GameConfig): GameState {
   const roles = {} as Record<Role, RoleState>;
 
   for (const role of ROLES) {
-    // Starting inventory is a single bucket that arrived at round 0
-    // It will start expiring after expiryWeeks rounds
-    const startingBucket: InventoryBucket = { arrivedRound: 0, quantity: config.startingInventory };
+    // Split starting inventory evenly across expiryWeeks buckets so players
+    // immediately see stock ageing across all shelf-life slots.
+    // e.g. expiryWeeks=3, startingInventory=12 → three buckets of 4 units
+    // aged at rounds -(expiryWeeks-1), -(expiryWeeks-2), …, 0
+    // → they expire in rounds 1, 2, 3 respectively.
+    const buckets: InventoryBucket[] = [];
+    const bucketCount  = config.expiryWeeks;          // one bucket per age slot
+    const baseQty      = Math.floor(config.startingInventory / bucketCount);
+    const remainder    = config.startingInventory - baseQty * bucketCount;
+
+    for (let i = 0; i < bucketCount; i++) {
+      const arrivedRound = -(bucketCount - 1 - i);    // oldest first: -(n-1), -(n-2), …, 0
+      const qty = baseQty + (i === bucketCount - 1 ? remainder : 0); // put remainder in newest bucket
+      if (qty > 0) buckets.push({ arrivedRound, quantity: qty });
+    }
+
     roles[role] = {
       ...DEFAULT_ROLE_STATE,
-      inventoryBuckets: [startingBucket],
+      inventoryBuckets: buckets,
       totalInventory: config.startingInventory,
       shipmentPipeline: role === 'manufacturer' ? [seed, seed] : [seed],
     };
