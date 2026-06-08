@@ -249,7 +249,7 @@ export default function GamePage() {
           </div>
         )}
         {submitted && (
-          <Badge variant="success" className="text-sm px-3 py-1.5">✓ Submitted</Badge>
+          <Badge variant="success">✓ Submitted</Badge>
         )}
       </div>
 
