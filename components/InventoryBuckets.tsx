@@ -14,12 +14,16 @@ interface InventoryBucketsProps {
  * Colour: red (expires this round) → amber (1 round left) → green (safe).
  */
 export function InventoryBuckets({ buckets, currentRound, expiryWeeks }: InventoryBucketsProps) {
-  if (!buckets || buckets.length === 0) {
-    return <p className="text-sm text-gray-400 italic">No inventory on hand.</p>;
-  }
-
-  const sorted = [...buckets].sort((a, b) => a.arrivedRound - b.arrivedRound);
-  const total  = sorted.reduce((s, b) => s + b.quantity, 0);
+  // When no real buckets exist, synthesise empty placeholder slots (one per week of shelf life)
+  // so the layout is always visible and consistent.
+  const hasBuckets = buckets && buckets.length > 0;
+  const sorted = hasBuckets
+    ? [...buckets].sort((a, b) => a.arrivedRound - b.arrivedRound)
+    : Array.from({ length: expiryWeeks }, (_, i) => ({
+        arrivedRound: currentRound - (expiryWeeks - 1 - i),
+        quantity: 0,
+      }));
+  const total = sorted.reduce((s, b) => s + b.quantity, 0);
 
   return (
     <div className="space-y-2">

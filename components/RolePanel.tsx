@@ -31,13 +31,15 @@ export function RolePanel({ role, rs, config, currentRound, isOwnRole }: RolePan
         <Stat label="Round cost" value={`$${rs.roundCost.toFixed(2)}`} />
       </div>
 
-      {isOwnRole && currentRound > 0 && (
+      {isOwnRole && (
         <>
-          <WastageAlert
-            wastedUnits={rs.wastedUnits}
-            wastageCost={rs.roundWastageCost}
-            wastageCostPerUnit={config.wastageCostPerUnit}
-          />
+          {currentRound > 0 && (
+            <WastageAlert
+              wastedUnits={rs.wastedUnits}
+              wastageCost={rs.roundWastageCost}
+              wastageCostPerUnit={config.wastageCostPerUnit}
+            />
+          )}
           <div className="mt-4">
             <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
               Inventory shelf life
