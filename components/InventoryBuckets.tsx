@@ -14,23 +14,27 @@ interface InventoryBucketsProps {
  * Colour: red (expires this round) → amber (1 round left) → green (safe).
  */
 export function InventoryBuckets({ buckets, currentRound, expiryWeeks }: InventoryBucketsProps) {
-  // When no real buckets exist, synthesise empty placeholder slots (one per week of shelf life)
-  // so the layout is always visible and consistent.
-  const hasBuckets = buckets && buckets.length > 0;
-  const sorted = hasBuckets
-    ? [...buckets].sort((a, b) => a.arrivedRound - b.arrivedRound)
-    : Array.from({ length: expiryWeeks }, (_, i) => ({
-        arrivedRound: currentRound - (expiryWeeks - 1 - i),
-        quantity: 0,
-      }));
-  const total = sorted.reduce((s, b) => s + b.quantity, 0);
+  // Always show exactly expiryWeeks slots (oldest → newest), regardless of how many
+  // real buckets exist. Quantities are summed per age group; empty ages show 0.
+  // This guarantees the full shelf-life spectrum is always visible.
+  const slots = Array.from({ length: expiryWeeks }, (_, i) => {
+    // i=0 → oldest slot (1w left), i=expiryWeeks-1 → newest slot (expiryWeeks w left)
+    const weeksLeft   = i + 1;
+    const age         = expiryWeeks - weeksLeft;          // 0 = freshest
+    const arrivedRound = currentRound - age;
+    const quantity    = (buckets ?? [])
+      .filter(b => (currentRound - b.arrivedRound) === age)
+      .reduce((s, b) => s + b.quantity, 0);
+    return { arrivedRound, quantity, weeksLeft, age };
+  });
+  const total = slots.reduce((s, sl) => s + sl.quantity, 0);
 
   return (
     <div className="space-y-2">
       <div className="flex items-end gap-2 flex-wrap">
-        {sorted.map((b, i) => {
-          const age       = currentRound - b.arrivedRound;
-          const remaining = expiryWeeks - age;
+        {slots.map((b, i) => {
+          const age       = b.age;
+          const remaining = b.weeksLeft;
 
           // Colour scheme
           let bg        = 'bg-green-100 border-green-300';
@@ -91,7 +95,7 @@ export function InventoryBuckets({ buckets, currentRound, expiryWeeks }: Invento
           </span>
           <p className="text-2xl font-bold mt-1.5 text-cake-700">{total}</p>
           <p className="text-[10px] text-gray-500">units</p>
-          <p className="text-[10px] text-gray-400 mt-1">{sorted.length} batch{sorted.length !== 1 ? 'es' : ''}</p>
+          <p className="text-[10px] text-gray-400 mt-1">{slots.filter(s => s.quantity > 0).length} batch{slots.filter(s => s.quantity > 0).length !== 1 ? 'es' : ''}</p>
           <div className="mt-1.5 h-1.5 bg-cake-200 rounded-full" />
         </div>
       </div>
