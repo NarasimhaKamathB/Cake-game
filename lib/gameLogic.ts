@@ -52,6 +52,7 @@ export function createInitialGameState(config: GameConfig): GameState {
       ...DEFAULT_ROLE_STATE,
       inventoryBuckets: buckets,
       totalInventory: config.startingInventory,
+      incomingOrder: seed,   // seed with week-1 demand so players see 4 (not 0) before round 1
       shipmentPipeline: role === 'manufacturer' ? [seed, seed] : [seed],
     };
   }
