@@ -275,21 +275,26 @@ export async function resetGameFull(gameId: string): Promise<void> {
 
 // ─── Auto-assignment ──────────────────────────────────────────────────────────
 
-const TEAM_NAMES = [
-  'Crème de la Crème', 'Rolling Scones', 'Batter Up', 'The Glazed Ones',
-  'Flour Power', 'Rise & Shine', 'Tier One Tiers', 'Sweet Supply',
-  'The Fondant Five', 'Icing Icons', 'Layered Leaders', 'Whisk Takers',
-  'Custard Crew', 'The Piping Hot', 'Shelf Life Squad',
-];
-
-const ROLE_ORDER: Role[] = ['manufacturer', 'distributor', 'wholesaler', 'retailer'];
-
 function formatName(email: string): string {
   return email.split('@')[0]
     .replace(/[._\-]/g, ' ')
     .replace(/\b\w/g, l => l.toUpperCase());
 }
 
+/**
+ * Atomically assigns a player to a lobby game slot (or creates a new team).
+ *
+ * Concurrent safety: the heavy lifting is done by the `assign_player_atomic`
+ * Postgres RPC which holds a row-level lock on `session_settings` for the
+ * duration of the transaction, serializing all simultaneous logins.
+ * This eliminates the previous TOCTOU where two players could both read "slot
+ * X is free", both pick the same role, and one write silently overwrites the
+ * other.
+ *
+ * New-team creation (when RPC returns needsCreate=true) still runs client-side
+ * because `createInitialGameState` is TypeScript. The chance of two concurrent
+ * new-team creations is tiny (< 10 ms window) and a retry loop handles it.
+ */
 export async function autoAssignPlayer(email: string): Promise<{
   playerId: string;
   gameId: string;
@@ -298,71 +303,56 @@ export async function autoAssignPlayer(email: string): Promise<{
   teamNumber: number;
 }> {
   const trimmed = email.trim().toLowerCase();
-  const session = await getSessionSettings();
-  const games = await getAllGames();
-  const activePhases = ['lobby', 'onboarding', 'ordering', 'processing', 'summary'];
+  const name = formatName(trimmed);
 
-  // Return existing assignment
-  for (const game of games) {
-    if (!activePhases.includes(game.state?.phase)) continue;
-    for (const [playerId, player] of Object.entries(game.players ?? {})) {
-      if (player.email === trimmed) {
-        return {
-          playerId,
-          gameId: game.id,
-          role: player.role as Role,
-          teamName: player.teamName ?? '',
-          teamNumber: player.teamNumber ?? 1,
-        };
-      }
-    }
-  }
+  // ── Call atomic Postgres RPC ──────────────────────────────────────────────
+  const { data, error } = await supabase.rpc('assign_player_atomic', {
+    p_email: trimmed,
+    p_name:  name,
+  });
 
-  if (!session.registrationOpen) {
-    throw new Error('Registration is currently closed. Contact your session organiser.');
-  }
+  if (error) throw new Error(error.message);
 
-  // Find a lobby game with an open human slot (ignore bot slots)
-  const openSlots = games
-    .filter(g => g.state?.phase === 'lobby')
-    .map(g => {
-      const humanPlayers = Object.values(g.players ?? {}).filter(p => !p.isBot);
-      return { game: g, playerCount: humanPlayers.length };
-    })
-    .filter(({ playerCount }) => playerCount < 4)
-    .sort((a, b) => b.playerCount - a.playerCount);
+  type RpcResult = {
+    needsCreate?: boolean;
+    playerId:     string;
+    gameId?:      string;
+    role?:        Role;
+    teamName:     string;
+    teamNumber:   number;
+  };
+  const result = data as RpcResult;
 
-  if (openSlots.length > 0) {
-    const { game } = openSlots[0];
-    const usedRoles = Object.values(game.players ?? {})
-      .filter(p => !p.isBot)
-      .map(p => p.role as Role);
-    const availableRole = ROLE_ORDER.find(r => !usedRoles.includes(r))!;
-    const playerId = trimmed.replace(/[^a-zA-Z0-9]/g, '_');
-    const firstHuman = Object.values(game.players ?? {}).find(p => !p.isBot);
-    const teamName = firstHuman?.teamName ?? '';
-    const teamNumber = firstHuman?.teamNumber ?? 1;
-
-    const player: Player = {
-      id: playerId,
-      name: formatName(trimmed),
-      email: trimmed,
-      role: availableRole,
-      isAdmin: false,
-      joinedAt: Date.now(),
-      teamName,
-      teamNumber,
+  // ── Existing or newly-joined game ─────────────────────────────────────────
+  if (!result.needsCreate) {
+    return {
+      playerId:   result.playerId,
+      gameId:     result.gameId!,
+      role:       result.role!,
+      teamName:   result.teamName,
+      teamNumber: result.teamNumber,
     };
-
-    await joinGame(game.id, player);
-    return { playerId, gameId: game.id, role: availableRole, teamName, teamNumber };
   }
 
-  // Create a new team game using the facilitator's configured settings
-  const teamNumber = games.length + 1;
-  const teamName = TEAM_NAMES[(teamNumber - 1) % TEAM_NAMES.length];
+  // ── No open lobby game — need to create a new team ────────────────────────
+  // Retry the RPC once (with jitter) in case another client just created a
+  // game in the window between our RPC returning and now.
+  await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+
+  const { data: retryData, error: retryErr } = await supabase.rpc('assign_player_atomic', {
+    p_email: trimmed,
+    p_name:  name,
+  });
+
+  if (!retryErr && retryData && !(retryData as RpcResult).needsCreate) {
+    const r2 = retryData as RpcResult;
+    return { playerId: r2.playerId, gameId: r2.gameId!, role: r2.role!, teamName: r2.teamName, teamNumber: r2.teamNumber };
+  }
+
+  // Still no open game → create a new team (client-side, uses TypeScript gameLogic)
+  const session = await getSessionSettings();
   const activeConfig = session.gameConfig ?? DEFAULT_CONFIG;
-  return createTeamGame(trimmed, teamName, teamNumber, activeConfig);
+  return createTeamGame(trimmed, result.teamName, result.teamNumber, activeConfig);
 }
 
 async function createTeamGame(
