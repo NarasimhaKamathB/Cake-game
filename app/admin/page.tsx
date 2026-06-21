@@ -34,6 +34,7 @@ function ConfigEditor({
   const [lostCost, setLostCost]         = useState(String(current.lostSalesCostPerUnit ?? 4));
   const [startInv, setStartInv]         = useState(String(current.startingInventory));
   const [scheduleStr, setScheduleStr]   = useState(current.demandSchedule.join(', '));
+  const [timerSecs, setTimerSecs]       = useState(String(current.orderTimerSeconds ?? 30));
 
   useEffect(() => {
     setTotalRounds(String(current.totalRounds));
@@ -43,6 +44,7 @@ function ConfigEditor({
     setLostCost(String(current.lostSalesCostPerUnit ?? 4));
     setStartInv(String(current.startingInventory));
     setScheduleStr(current.demandSchedule.join(', '));
+    setTimerSecs(String(current.orderTimerSeconds ?? 30));
   }, [current]);
 
   function parseSchedule(raw: string): number[] {
@@ -69,6 +71,7 @@ function ConfigEditor({
       lostSalesCostPerUnit:  Math.max(0, parseFloat(lostCost)   || DEFAULT_CONFIG.lostSalesCostPerUnit),
       startingInventory:     Math.max(0, parseInt(startInv)     || DEFAULT_CONFIG.startingInventory),
       demandSchedule:        schedule,
+      orderTimerSeconds:     Math.max(5, parseInt(timerSecs)    || DEFAULT_CONFIG.orderTimerSeconds),
     };
     setSaving(true);
     try {
@@ -93,6 +96,7 @@ function ConfigEditor({
           <p className="font-semibold text-cake-700">⚙️ Game Configuration</p>
           <p className="text-xs text-gray-400 mt-0.5">
             {current.totalRounds} weeks · {current.expiryWeeks}-week expiry ·
+            {current.orderTimerSeconds ?? 30}s timer ·
             demand {current.demandSchedule.slice(0, 3).join(', ')}{current.demandSchedule.length > 3 ? '…' : ''}
           </p>
         </div>
@@ -154,6 +158,14 @@ function ConfigEditor({
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
               />
             </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-gray-600">Order Timer (seconds)</span>
+              <input
+                type="number" min={5} max={300} value={timerSecs}
+                onChange={e => setTimerSecs(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cake-400"
+              />
+            </label>
           </div>
 
           <label className="block space-y-1">
@@ -186,6 +198,7 @@ function ConfigEditor({
               setLostCost(String(DEFAULT_CONFIG.lostSalesCostPerUnit));
               setStartInv(String(DEFAULT_CONFIG.startingInventory));
               setScheduleStr(DEFAULT_CONFIG.demandSchedule.join(', '));
+              setTimerSecs(String(DEFAULT_CONFIG.orderTimerSeconds));
             }}>
               Reset to Default
             </Button>

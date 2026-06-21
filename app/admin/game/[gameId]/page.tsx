@@ -159,8 +159,9 @@ function ChartsSection({ state }: { state: GameState }) {
 
 export default function AdminGamePage() {
   const { gameId } = useParams<{ gameId: string }>();
-  const [game, setGame]       = useState<Game | null>(null);
+  const [game, setGame]           = useState<Game | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [pausing, setPausing]     = useState(false);
 
   useEffect(() => {
     if (!gameId) return;
@@ -188,7 +189,6 @@ export default function AdminGamePage() {
     setAdvancing(true);
     try {
       if (state.phase === 'ordering') {
-        // Force-process round with current pending orders (fill missing with rational)
         const stored = (
           (state as GameState & { pendingOrders?: Partial<Record<Role, number>> }).pendingOrders ?? {}
         ) as Partial<Record<Role, number>>;
@@ -219,6 +219,30 @@ export default function AdminGamePage() {
     await updateGameState(gameId, { phase: 'ended' });
   }
 
+  async function handlePause() {
+    setPausing(true);
+    try {
+      await updateGameState(gameId, { paused: true, pausedAt: Date.now() });
+    } finally { setPausing(false); }
+  }
+
+  async function handleResume() {
+    setPausing(true);
+    try {
+      // Shift roundStartedAt forward by the time spent paused so the timer
+      // resumes from where it was frozen.
+      const pausedAt = state.pausedAt ?? Date.now();
+      const pauseDuration = Date.now() - pausedAt;
+      const newStartedAt = (state.roundStartedAt ?? pausedAt) + pauseDuration;
+      const resumePatch: Partial<GameState> = {
+        paused: false,
+        pausedAt: undefined,
+        roundStartedAt: newStartedAt,
+      };
+      await updateGameState(gameId, resumePatch);
+    } finally { setPausing(false); }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -228,16 +252,17 @@ export default function AdminGamePage() {
           <h2 className="text-2xl font-bold text-gray-800 mt-1">{teamName}</h2>
           <div className="flex items-center gap-3 mt-1">
             <Badge variant={
+              state.paused               ? 'warning' :
               state.phase === 'ordering' ? 'warning' :
               state.phase === 'summary'  ? 'default' :
               state.phase === 'ended'    ? 'success' : 'info'
             }>
-              {state.phase}
+              {state.paused ? '⏸ paused' : state.phase}
             </Badge>
             <span className="text-sm text-gray-500">
               Round {state.currentRound} / {config.totalRounds}
             </span>
-            {state.phase === 'ordering' && (
+            {state.phase === 'ordering' && !state.paused && (
               <span className="text-sm text-amber-600">
                 {doneCount}/{playerCount} players submitted
               </span>
@@ -246,7 +271,18 @@ export default function AdminGamePage() {
         </div>
 
         <div className="flex gap-2">
-          {state.phase === 'ordering' && (
+          {/* Pause / Resume — only during ordering */}
+          {state.phase === 'ordering' && !state.paused && (
+            <Button onClick={handlePause} disabled={pausing} variant="ghost">
+              ⏸ Pause
+            </Button>
+          )}
+          {state.phase === 'ordering' && state.paused && (
+            <Button onClick={handleResume} disabled={pausing}>
+              ▶ Resume
+            </Button>
+          )}
+          {state.phase === 'ordering' && !state.paused && (
             <Button onClick={handleAdvance} disabled={advancing} variant="ghost">
               ⏩ Force Process Round
             </Button>
@@ -289,14 +325,14 @@ export default function AdminGamePage() {
       {state.phase === 'ended' && <GameResults game={game} />}
 
       {state.phase === 'summary' && (
-        <>
+        <div>
           <WeeklySummary state={state} config={config} />
           <ChartsSection state={state} />
-        </>
+        </div>
       )}
 
       {(state.phase === 'ordering' || state.phase === 'processing') && (
-        <>
+        <div className="space-y-4">
           {/* All 4 role panels */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {ROLES.map(role => {
@@ -354,7 +390,7 @@ export default function AdminGamePage() {
 
           {/* Charts (available once at least one round has been played) */}
           <ChartsSection state={state} />
-        </>
+        </div>
       )}
 
       {(state.phase === 'lobby' || state.phase === 'onboarding') && (

@@ -13,8 +13,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
-// How long players have to submit their order before auto-submit fires (seconds)
-const TIMER_SECONDS = 30;
 // How long the summary screen is shown before auto-advancing to next round (seconds)
 const SUMMARY_HOLD_SECONDS = 12;
 
@@ -27,7 +25,7 @@ export default function GamePage() {
   const [order, setOrder]         = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft]   = useState<number>(TIMER_SECONDS);
+  const [timeLeft, setTimeLeft]   = useState<number>(30);
   const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -92,14 +90,24 @@ export default function GamePage() {
     setSubmitted(true);
   }, [gameId]);
 
-  // Start/reset countdown each time the ordering phase begins
+  // Start/reset countdown each time the ordering phase begins (or paused state changes)
   useEffect(() => {
     if (!game || game.state.phase !== 'ordering') return;
+
+    const timerSeconds = game.config.orderTimerSeconds ?? 30;
+
+    // Frozen while paused — show remaining time but don't count down
+    if (game.state.paused) {
+      const startedAt = game.state.roundStartedAt ?? Date.now();
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setTimeLeft(Math.max(0, timerSeconds - elapsed));
+      return;
+    }
 
     // Derive remaining time from server-stamped roundStartedAt when available
     const startedAt = game.state.roundStartedAt ?? Date.now();
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-    const initial = Math.max(0, TIMER_SECONDS - elapsed);
+    const initial = Math.max(0, timerSeconds - elapsed);
 
     setTimeLeft(initial);
 
@@ -119,16 +127,16 @@ export default function GamePage() {
     }, 1000);
 
     return () => clearInterval(interval);
-    // Re-run when round advances (currentRound changes) or phase changes
+    // Re-run when round advances, phase changes, paused state changes, or roundStartedAt shifts (resume)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.state.phase, game?.state.currentRound]);
+  }, [game?.state.phase, game?.state.currentRound, game?.state.paused, game?.state.roundStartedAt]);
 
-  // Auto-submit when timer hits zero and not yet submitted
+  // Auto-submit when timer hits zero and not yet submitted (only when not paused)
   useEffect(() => {
-    if (timeLeft === 0 && !submitted && game?.state.phase === 'ordering') {
+    if (timeLeft === 0 && !submitted && game?.state.phase === 'ordering' && !game?.state.paused) {
       handleAutoSubmit();
     }
-  }, [timeLeft, submitted, game?.state.phase, handleAutoSubmit]);
+  }, [timeLeft, submitted, game?.state.phase, game?.state.paused, handleAutoSubmit]);
 
   // ── Manual order submission ─────────────────────────────────────────────────
   const handleSubmitOrder = useCallback(async () => {
@@ -211,6 +219,7 @@ export default function GamePage() {
   const myRs = myRole ? state.roles[myRole] : null;
   const playerCount = Object.keys(game.players).length;
   const doneCount = state.playersDoneOrdering?.length ?? 0;
+  const timerSeconds = config.orderTimerSeconds ?? 30;
 
   // Timer colour: red < 10s, amber < 20s, green otherwise
   const timerColor =
@@ -220,6 +229,17 @@ export default function GamePage() {
 
   return (
     <div className="space-y-4">
+      {/* ── Pause banner ── */}
+      {state.paused && (
+        <div className="bg-amber-100 border border-amber-300 rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-800 shadow">
+          <span className="text-2xl">⏸</span>
+          <div>
+            <p className="font-bold text-base">Game Paused</p>
+            <p className="text-xs opacity-75">The facilitator has paused the game. Your timer is frozen — please wait.</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Prominent round banner ── */}
       <div className="bg-cake-600 text-white rounded-2xl px-6 py-4 flex items-center justify-between shadow">
         <div>
@@ -238,13 +258,14 @@ export default function GamePage() {
         {/* Timer */}
         {!submitted && (
           <div className="text-right">
-            <p className="text-xs opacity-75">Auto-submit in</p>
+            <p className="text-xs opacity-75">{state.paused ? 'Timer frozen' : 'Auto-submit in'}</p>
             <p className={`text-3xl font-extrabold leading-none ${
+              state.paused ? 'text-amber-300' :
               timeLeft <= 10 ? 'text-red-300 animate-pulse' :
               timeLeft <= 20 ? 'text-amber-300' :
               'text-white'
             }`}>
-              {timeLeft}s
+              {state.paused ? '⏸' : `${timeLeft}s`}
             </p>
           </div>
         )}
@@ -315,8 +336,12 @@ export default function GamePage() {
             </Button>
           </div>
           <p className="text-xs text-amber-600 mt-2">
-            ⚠️ Auto-submits in <strong className={timerColor}>{timeLeft}s</strong> if no order placed.
-            Any inventory older than {config.expiryWeeks} rounds will expire (${config.wastageCostPerUnit}/unit).
+            {state.paused
+              ? '⏸ Game is paused — timer is frozen. Submit your order when the game resumes.'
+              : `⚠️ Auto-submits in `}
+            {!state.paused && <strong className={timerColor}>{timeLeft}s</strong>}
+            {!state.paused && ` if no order placed.`}
+            {` Any inventory older than ${config.expiryWeeks} rounds will expire ($${config.wastageCostPerUnit}/unit).`}
           </p>
         </Card>
       )}

@@ -54,8 +54,12 @@ export interface GameState {
   currentRound: number;
   roles: Record<Role, RoleState>;
   playersDoneOrdering: string[];
-  /** Epoch ms when the current ordering phase began — used for the 30s auto-submit timer. */
+  /** Epoch ms when the current ordering phase began — used for the order timer. */
   roundStartedAt?: number;
+  /** True while the facilitator has paused the game. */
+  paused?: boolean;
+  /** Epoch ms when the game was paused — used to adjust roundStartedAt on resume. */
+  pausedAt?: number;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -68,6 +72,8 @@ export interface GameConfig {
   expiryWeeks: number;
   startingInventory: number;
   demandSchedule: number[];
+  /** Seconds players have to submit before auto-submit fires (default 30). */
+  orderTimerSeconds: number;
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -78,6 +84,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   expiryWeeks: 3,
   startingInventory: 12,
   demandSchedule: [4, 4, 8, 12, 16, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+  orderTimerSeconds: 30,
 };
 
 // ─── Player ───────────────────────────────────────────────────────────────────
