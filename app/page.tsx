@@ -63,9 +63,11 @@ export default function HomePage() {
         </form>
 
         <div className="mt-5 pt-5 border-t border-gray-100 space-y-2 text-xs text-gray-400">
+          <p>🏆 This is a <strong className="text-gray-500">team game</strong> — you&apos;ll be assigned to a 4-person team. The team with the lowest total cost wins.</p>
           <p>🎭 You&apos;ll be auto-assigned a role: Manufacturer, Distributor, Wholesaler, or Retailer.</p>
-          <p>⏰ Inventory expires after 3 rounds. Wastage costs $2/unit.</p>
-          <p>📉 Unmet demand is lost — $4/unit penalty. No backlog.</p>
+          <p>📉 <strong className="text-gray-500">Lost sales — $4/unit</strong> for every unit of unmet demand. No backlog.</p>
+          <p>⏰ <strong className="text-gray-500">Wastage — $2/unit</strong> for every unit that expires (shelf life: 3 rounds).</p>
+          <p>📦 <strong className="text-gray-500">Holding — $0.50/unit/week</strong> for every unit kept in inventory.</p>
         </div>
       </div>
 
