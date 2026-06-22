@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { subscribeToGame } from '@/lib/supabase';
+import { subscribeToGame, getGame } from '@/lib/supabase';
 import { Game, ROLE_LABELS, ROLE_DESCRIPTIONS, ROLE_TAGS, Role } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +19,8 @@ function AssignedContent() {
 
   useEffect(() => {
     if (!gameId) return;
+    // Load current state immediately so the players list isn't empty on mount.
+    getGame(gameId).then(g => { if (g) setGame(g); });
     const unsub = subscribeToGame(gameId, g => {
       setGame(g);
       if (g?.state.phase === 'onboarding' || g?.state.phase === 'ordering') {
