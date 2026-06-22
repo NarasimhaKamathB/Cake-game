@@ -43,6 +43,11 @@ export default function GamePage() {
       if (g?.state.phase === 'ordering') {
         setSubmitted(false);
         autoSubmittedRef.current = false;
+        // Reset timeLeft in the same React batch so the render that follows
+        // never sees timeLeft===0 at the start of a new ordering phase.
+        // Without this, the auto-submit effect fires immediately on every
+        // even round because timeLeft is 0 left over from the prior countdown.
+        setTimeLeft(g.config?.orderTimerSeconds ?? 30);
       }
     });
     return unsub;
