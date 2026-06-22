@@ -422,6 +422,7 @@ function SummaryView({
     <div className="space-y-6">
       {/* Round banner */}
       <div className="bg-cake-600 text-white rounded-2xl px-6 py-3 flex items-center justify-between">
+        <div>
           <p className="text-xs opacity-75 uppercase tracking-wide">Round Completed</p>
           <p className="text-2xl font-extrabold">
             {game.state.currentRound}
