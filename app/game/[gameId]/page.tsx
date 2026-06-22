@@ -205,7 +205,10 @@ export default function GamePage() {
 
   const { state, config } = game;
 
-  if (state.phase === 'ended') return <GameResults game={game} />;
+  // Derive team name from the players map (server-sourced, always accurate)
+  const teamName = myPlayerId ? (game.players[myPlayerId]?.teamName ?? '') : '';
+
+  if (state.phase === 'ended') return <GameResults game={game} teamName={teamName} />;
 
   if (state.phase === 'summary') {
     return (
@@ -258,6 +261,9 @@ export default function GamePage() {
             {state.currentRound + 1}
             <span className="text-base font-normal opacity-60"> / {config.totalRounds}</span>
           </p>
+          {teamName && (
+            <p className="text-xs opacity-70 mt-0.5">🏆 {teamName}</p>
+          )}
         </div>
         {myRole && (
           <div className="text-right">

@@ -140,9 +140,10 @@ const CHART_CONFIGS: ChartConfig[] = [
 
 interface GameResultsProps {
   game: Game;
+  teamName?: string;
 }
 
-export function GameResults({ game }: GameResultsProps) {
+export function GameResults({ game, teamName }: GameResultsProps) {
   const { state, config } = game;
 
   const teamTotal   = ROLES.reduce((s, r) => s + (state.roles[r]?.totalCost ?? 0), 0);
@@ -159,11 +160,17 @@ export function GameResults({ game }: GameResultsProps) {
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-cake-700">🎂 Game Over</h2>
+        {teamName && (
+          <p className="text-lg font-semibold text-cake-600 mt-1">🏆 {teamName}</p>
+        )}
         <p className="text-gray-500 mt-1">Final results after {config.totalRounds} rounds</p>
       </div>
 
       {/* Team totals */}
       <Card className="text-center bg-cake-50">
+        {teamName && (
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{teamName}</p>
+        )}
         <p className="text-sm text-gray-500">Total Team Cost</p>
         <p className="text-4xl font-bold text-cake-700 my-1">${teamTotal.toFixed(2)}</p>
         <div className="flex justify-center gap-6 text-sm text-gray-500 mt-2">
