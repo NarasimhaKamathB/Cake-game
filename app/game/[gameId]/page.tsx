@@ -144,29 +144,39 @@ export default function GamePage() {
     setSubmitting(true);
 
     try {
-      const playersDone = [...(game.state.playersDoneOrdering ?? [])];
+      // Read fresh state first — avoids the playersDoneOrdering race where two
+      // players submit simultaneously, both read [] from stale React state, and
+      // each write only themselves (last writer wins, one ID silently lost).
+      const freshGame = await getGame(gameId);
+      if (!freshGame || freshGame.state.phase !== 'ordering') {
+        // Phase changed underneath us (e.g. auto-submit already fired) — just mark done
+        setSubmitted(true);
+        return;
+      }
+
+      const playersDone = [...(freshGame.state.playersDoneOrdering ?? [])];
       if (!playersDone.includes(myPlayerId)) playersDone.push(myPlayerId);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const storedOrders = ((game.state as any).pendingOrders ?? {}) as Partial<Record<Role, number>>;
+      const storedOrders = ((freshGame.state as any).pendingOrders ?? {}) as Partial<Record<Role, number>>;
       const mergedOrders: Record<Role, number> = {
         retailer: 0, wholesaler: 0, distributor: 0, manufacturer: 0,
         ...storedOrders,
         [myRole]: order,
       };
 
-      // Check if all (non-bot-still-pending) players have now submitted
-      const allPlayerIds = Object.keys(game.players);
+      // Check if all players have now submitted
+      const allPlayerIds = Object.keys(freshGame.players);
       const allDone = allPlayerIds.every(id => playersDone.includes(id));
 
       if (allDone) {
-        // Fill any remaining roles (shouldn't happen since bots are pre-filled, but safe fallback)
+        // Fill any remaining roles as a safe fallback
         for (const role of ROLES) {
           if (mergedOrders[role] === 0 && !storedOrders[role]) {
-            mergedOrders[role] = game.state.roles[role]?.incomingOrder ?? 0;
+            mergedOrders[role] = freshGame.state.roles[role]?.incomingOrder ?? 0;
           }
         }
-        const newState = processRound(game.state, game.config, mergedOrders);
+        const newState = processRound(freshGame.state, freshGame.config, mergedOrders);
         delete (newState as GameState & { pendingOrders?: unknown }).pendingOrders;
         await updateFullGameState(gameId, newState);
       } else {
@@ -388,52 +398,28 @@ function SummaryView({
     return () => clearInterval(interval);
   }, [isLastRound, game.state.currentRound]);
 
-  // When countdown reaches 0, advance (first caller wins; subsequent calls are no-ops)
+  // When countdown reaches 0, advance (first caller wins; subsequent calls are no-ops).
+  // Guard: re-read fresh DB state before writing so a delayed client never overwrites
+  // an already-ended game (Bug 1: Round 21/20) or a game that already advanced
+  // (Bug 3a: stale roundStartedAt → immediate auto-submit on next round).
   useEffect(() => {
     if (countdown === 0 && !advancedRef.current && !isLastRound) {
       advancedRef.current = true;
-      updateGameState(gameId, {
-        phase: 'ordering',
-        roundStartedAt: Date.now(),
-      });
+      (async () => {
+        const fresh = await getGame(gameId);
+        // Only advance if STILL in summary AND on the same round we mounted for
+        if (
+          !fresh ||
+          fresh.state.phase !== 'summary' ||
+          fresh.state.currentRound !== game.state.currentRound
+        ) return;
+        await updateGameState(gameId, { phase: 'ordering', roundStartedAt: Date.now() });
+      })();
     }
-  }, [countdown, isLastRound, gameId]);
+  }, [countdown, isLastRound, gameId, game.state.currentRound]);
 
   return (
     <div className="space-y-6">
       {/* Round banner */}
       <div className="bg-cake-600 text-white rounded-2xl px-6 py-3 flex items-center justify-between">
         <div>
-          <p className="text-xs opacity-75 uppercase tracking-wide">Round Completed</p>
-          <p className="text-2xl font-extrabold">
-            {game.state.currentRound}
-            <span className="text-sm font-normal opacity-60"> / {game.config.totalRounds}</span>
-          </p>
-        </div>
-        {!isLastRound && (
-          <div className="text-right">
-            <p className="text-xs opacity-75">Next round in</p>
-            <p className={`text-3xl font-extrabold ${countdown <= 5 ? 'animate-pulse' : ''}`}>
-              {countdown}s
-            </p>
-          </div>
-        )}
-      </div>
-
-      <WeeklySummary state={game.state} config={game.config} myRole={myRole} />
-
-      {isLastRound && (
-        <div className="flex justify-center">
-          <Button
-            onClick={async () => {
-              await updateGameState(gameId, { phase: 'ended' });
-            }}
-            size="lg"
-          >
-            View Final Results →
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
