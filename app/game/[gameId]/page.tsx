@@ -422,4 +422,36 @@ function SummaryView({
     <div className="space-y-6">
       {/* Round banner */}
       <div className="bg-cake-600 text-white rounded-2xl px-6 py-3 flex items-center justify-between">
-        <div>
+          <p className="text-xs opacity-75 uppercase tracking-wide">Round Completed</p>
+          <p className="text-2xl font-extrabold">
+            {game.state.currentRound}
+            <span className="text-sm font-normal opacity-60"> / {game.config.totalRounds}</span>
+          </p>
+        </div>
+        {!isLastRound && (
+          <div className="text-right">
+            <p className="text-xs opacity-75">Next round in</p>
+            <p className={`text-3xl font-extrabold ${countdown <= 5 ? 'animate-pulse' : ''}`}>
+              {countdown}s
+            </p>
+          </div>
+        )}
+      </div>
+
+      <WeeklySummary state={game.state} config={game.config} myRole={myRole} />
+
+      {isLastRound && (
+        <div className="flex justify-center">
+          <Button
+            onClick={async () => {
+              await updateGameState(gameId, { phase: 'ended' });
+            }}
+            size="lg"
+          >
+            View Final Results →
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

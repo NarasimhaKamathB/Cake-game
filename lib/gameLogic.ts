@@ -277,5 +277,14 @@ export function getCustomerDemand(config: GameConfig): number {
 
 /**
  * Simple heuristic order suggestion for a player:
- * order = demand + (target_stock - current_stock)
- * where target_stock is 2x the average demand to buffer for expiry ris
+ * where target_stock is 2x the average demand to buffer for expiry risk.
+ */
+export function getSuggestedOrder(rs: RoleState, config: GameConfig): number {
+  const schedule = config.demandSchedule ?? [];
+  const avgDemand = schedule.length > 0
+    ? Math.round(schedule.reduce((s, v) => s + v, 0) / schedule.length)
+    : 10;
+  const targetStock = avgDemand * 2;
+  const suggestion = Math.max(0, rs.incomingOrder + (targetStock - rs.totalInventory));
+  return suggestion;
+}
