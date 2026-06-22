@@ -5,6 +5,7 @@ import { subscribeToGame } from '@/lib/supabase';
 import { Game, ROLE_LABELS, ROLE_DESCRIPTIONS, ROLE_TAGS, Role } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { TutorialModal } from '@/components/TutorialModal';
 
 function AssignedContent() {
   const params = useSearchParams();
@@ -14,6 +15,7 @@ function AssignedContent() {
   const team = params.get('team') ?? '';
 
   const [game, setGame] = useState<Game | null>(null);
+  const [showTutorial, setShowTutorial] = useState(true);
 
   useEffect(() => {
     if (!gameId) return;
@@ -29,11 +31,21 @@ function AssignedContent() {
   const players = game ? Object.values(game.players) : [];
 
   return (
-    <div className="max-w-lg mx-auto mt-12 space-y-6">
+    <>
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+      <div className="max-w-lg mx-auto mt-12 space-y-6">
       <div className="text-center">
         <div className="text-5xl mb-3">🎭</div>
         <h2 className="text-2xl font-bold text-cake-700">You&apos;re in!</h2>
         <p className="text-gray-500">Waiting for the facilitator to start the game.</p>
+        {!showTutorial && (
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="mt-2 text-sm text-cake-600 hover:text-cake-800 underline underline-offset-2"
+          >
+            📖 Watch the tutorial again
+          </button>
+        )}
       </div>
 
       <Card className="text-center">
@@ -68,7 +80,6 @@ function AssignedContent() {
         <ul className="list-disc list-inside space-y-1 text-xs">
           <li>Any stock held for more than <strong>3 rounds</strong> expires automatically.</li>
           <li>Expired units cost <strong>$2/unit</strong> in wastage.</li>
-          <li>Unfulfilled demand is <strong>lost</strong> — no backlog.</li>
           <li>Order wisely: over-ordering wastes money, under-ordering loses sales.</li>
         </ul>
       </div>
@@ -77,6 +88,7 @@ function AssignedContent() {
         ⏳ Waiting for facilitator to start...
       </p>
     </div>
+    </>
   );
 }
 
