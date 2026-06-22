@@ -27,7 +27,8 @@ export default function GamePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft]   = useState<number>(30);
-  const [showTutorial, setShowTutorial] = useState(true);
+  // Only auto-show tutorial in lobby; never interrupt an active game round.
+  const [showTutorial, setShowTutorial] = useState(false);
   const autoSubmittedRef = useRef(false);
   // Track which round this client submitted in — used to avoid resetting
   // submitted=false when Supabase fires a Realtime update for the SAME round
@@ -106,9 +107,18 @@ export default function GamePage() {
     setSubmitted(true);
   }, [gameId]);
 
-  // Start/reset countdown each time the ordering phase begins (or paused state changes)
+  // Start/reset countdown each time the ordering phase begins (or paused state changes).
+  // Also resets submitted/autoSubmitted when the round number changes — this is a safety
+  // net for when the Realtime callback hasn't arrived yet but the local game state already
+  // shows a new round (e.g., fast Supabase write that bypasses the subscription briefly).
   useEffect(() => {
     if (!game || game.state.phase !== 'ordering') return;
+
+    const currentRound = game.state.currentRound;
+    if (currentRound !== submittedRoundRef.current && submittedRoundRef.current !== -1) {
+      setSubmitted(false);
+      autoSubmittedRef.current = false;
+    }
 
     const timerSeconds = game.config.orderTimerSeconds ?? 30;
 
@@ -147,12 +157,15 @@ export default function GamePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.state.phase, game?.state.currentRound, game?.state.paused, game?.state.roundStartedAt]);
 
-  // Auto-submit when timer hits zero and not yet submitted (only when not paused)
+  // Auto-submit when timer hits zero (only when not paused).
+  // NOTE: do NOT gate on !submitted here. If the player already manually submitted,
+  // handleAutoSubmit still needs to run to process any remaining roles when the timer
+  // expires. autoSubmittedRef prevents double-firing.
   useEffect(() => {
-    if (timeLeft === 0 && !submitted && game?.state.phase === 'ordering' && !game?.state.paused) {
+    if (timeLeft === 0 && game?.state.phase === 'ordering' && !game?.state.paused) {
       handleAutoSubmit();
     }
-  }, [timeLeft, submitted, game?.state.phase, game?.state.paused, handleAutoSubmit]);
+  }, [timeLeft, game?.state.phase, game?.state.paused, handleAutoSubmit]);
 
   // ── Manual order submission ─────────────────────────────────────────────────
   const handleSubmitOrder = useCallback(async () => {
@@ -238,6 +251,13 @@ export default function GamePage() {
   }
 
   if (state.phase === 'lobby' || state.phase === 'onboarding') {
+    // Auto-open tutorial the first time the lobby renders.
+    // We use a one-shot flag so it doesn't re-open if the player dismissed it.
+    if (!showTutorial && typeof window !== 'undefined' && !sessionStorage.getItem('tutorialSeen')) {
+      sessionStorage.setItem('tutorialSeen', '1');
+      // Schedule outside render to avoid setState-during-render warning
+      setTimeout(() => setShowTutorial(true), 0);
+    }
     return (
       <>
         {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
@@ -270,9 +290,6 @@ export default function GamePage() {
 
   return (
     <div className="space-y-4">
-      {/* ── Tutorial modal (auto-opens on first load; player can dismiss) ── */}
-      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
-
       {/* ── Pause banner ── */}
       {state.paused && (
         <div className="bg-amber-100 border border-amber-300 rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-800 shadow">
@@ -360,17 +377,9 @@ export default function GamePage() {
       {/* Order input */}
       {myRole && myRs && !submitted && (
         <Card className="border-cake-300 bg-cake-50">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-cake-700">
-              Place your order — {ROLE_LABELS[myRole]}
-            </h3>
-            <button
-              onClick={() => setShowTutorial(true)}
-              className="text-xs text-cake-500 hover:text-cake-700 underline underline-offset-2"
-            >
-              📖 How to play
-            </button>
-          </div>
+          <h3 className="font-semibold text-cake-700 mb-1">
+            Place your order — {ROLE_LABELS[myRole]}
+          </h3>
           <p className="text-xs text-gray-500 mb-3">
             Current inventory: <strong>{myRs.totalInventory}</strong> units &nbsp;|&nbsp;
             Demand this round: <strong>{myRs.incomingOrder}</strong> units &nbsp;|&nbsp;
@@ -462,6 +471,7 @@ function SummaryView({
       })();
     }
   }, [countdown, isLastRound, gameId, game.state.currentRound]);
+
 
 
   return (
