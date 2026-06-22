@@ -29,6 +29,10 @@ export default function GamePage() {
   const [timeLeft, setTimeLeft]   = useState<number>(30);
   const [showTutorial, setShowTutorial] = useState(true);
   const autoSubmittedRef = useRef(false);
+  // Track which round this client submitted in — used to avoid resetting
+  // submitted=false when Supabase fires a Realtime update for the SAME round
+  // (e.g. another player updating playersDoneOrdering triggers the callback too).
+  const submittedRoundRef = useRef<number>(-1);
 
   useEffect(() => {
     const role = sessionStorage.getItem('role') as Role | null;
@@ -43,12 +47,16 @@ export default function GamePage() {
     const unsub = subscribeToGame(gameId, g => {
       if (g) setGame(g);
       if (g?.state.phase === 'ordering') {
-        setSubmitted(false);
-        autoSubmittedRef.current = false;
-        // Reset timeLeft in the same React batch so the render that follows
-        // never sees timeLeft===0 at the start of a new ordering phase.
-        // Without this, the auto-submit effect fires immediately on every
-        // even round because timeLeft is 0 left over from the prior countdown.
+        // Only reset submitted when the round number has CHANGED (new round started).
+        // Do NOT reset if it's the same round — that would undo the player's submission
+        // when Supabase fires a Realtime update for a peer's playersDoneOrdering write.
+        const newRound = g.state.currentRound;
+        if (newRound !== submittedRoundRef.current) {
+          setSubmitted(false);
+          autoSubmittedRef.current = false;
+        }
+        // Always keep timeLeft fresh in the same batch so the alternating-round
+        // auto-submit bug (stale 0 from prior round) cannot occur.
         setTimeLeft(g.config?.orderTimerSeconds ?? 30);
       }
     });
@@ -94,6 +102,7 @@ export default function GamePage() {
     // Set roundStartedAt for the next ordering phase (processed by processRound → summary,
     // so this field on newState won't conflict)
     await updateFullGameState(gameId, newState);
+    submittedRoundRef.current = freshGame.state.currentRound;
     setSubmitted(true);
   }, [gameId]);
 
@@ -194,6 +203,7 @@ export default function GamePage() {
         });
       }
 
+      submittedRoundRef.current = freshGame.state.currentRound;
       setSubmitted(true);
     } finally {
       setSubmitting(false);
@@ -260,6 +270,9 @@ export default function GamePage() {
 
   return (
     <div className="space-y-4">
+      {/* ── Tutorial modal (auto-opens on first load; player can dismiss) ── */}
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+
       {/* ── Pause banner ── */}
       {state.paused && (
         <div className="bg-amber-100 border border-amber-300 rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-800 shadow">
@@ -347,9 +360,17 @@ export default function GamePage() {
       {/* Order input */}
       {myRole && myRs && !submitted && (
         <Card className="border-cake-300 bg-cake-50">
-          <h3 className="font-semibold text-cake-700 mb-1">
-            Place your order — {ROLE_LABELS[myRole]}
-          </h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold text-cake-700">
+              Place your order — {ROLE_LABELS[myRole]}
+            </h3>
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="text-xs text-cake-500 hover:text-cake-700 underline underline-offset-2"
+            >
+              📖 How to play
+            </button>
+          </div>
           <p className="text-xs text-gray-500 mb-3">
             Current inventory: <strong>{myRs.totalInventory}</strong> units &nbsp;|&nbsp;
             Demand this round: <strong>{myRs.incomingOrder}</strong> units &nbsp;|&nbsp;
