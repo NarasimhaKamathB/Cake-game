@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Cake Game — 60s Teaser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1280px;height:720px;overflow:hidden;
+    background:#FFF8F0;
+    font-family:'Inter',system-ui,sans-serif;
+    user-select:none;
+  }
+
+  /* ── Progress bar ── */
+  #progress{
+    position:fixed;bottom:0;left:0;height:5px;
+    background:#C26A1A;z-index:999;
+    transition:width 0.1s linear;
+  }
+
+  /* ── Play overlay ── */
+  #overlay{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(59,26,8,0.55);z-index:998;cursor:pointer;
+  }
+  #overlay .btn{
+    width:110px;height:110px;border-radius:50%;
+    background:#C26A1A;display:flex;align-items:center;justify-content:center;
+    font-size:44px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  /* ── Slides ── */
+  .slide{
+    position:absolute;inset:0;opacity:0;pointer-events:none;
+    transition:opacity 0.6s ease;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:50px 70px;
+  }
+  .slide.active{opacity:1;pointer-events:all}
+
+  /* ── Typography ── */
+  h1{font-size:56px;font-weight:900;color:#3B1A08;line-height:1.1;text-align:center}
+  h2{font-size:42px;font-weight:800;color:#3B1A08;line-height:1.15;text-align:center}
+  .sub{font-size:24px;color:#7A4A20;margin-top:14px;text-align:center;max-width:860px;line-height:1.4}
+  .amber{color:#C26A1A}
+  .red{color:#DC2626}
+  .green{color:#059669}
+  .purple{color:#7C3AED}
+
+  /* ── Supply chain ── */
+  .chain{
+    display:flex;align-items:center;gap:0;
+    margin-top:28px;
+  }
+  .role{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:176px;min-height:90px;border-radius:14px;
+    font-weight:700;color:#fff;padding:10px 8px;
+    transform:scale(0.4) translateY(30px);opacity:0;
+    transition:transform 0.5s cubic-bezier(.34,1.56,.64,1),opacity 0.4s ease;
+    position:relative;
+  }
+  .role.pop{transform:scale(1) translateY(0);opacity:1}
+  .role .rlabel{font-size:17px;margin-top:2px}
+  .role .ricon{font-size:30px}
+
+  .r-mfg{background:linear-gradient(135deg,#7C3AED,#6D28D9)}
+  .r-dst{background:linear-gradient(135deg,#2563EB,#1D4ED8)}
+  .r-whl{background:linear-gradient(135deg,#059669,#047857)}
+  .r-rtl{background:linear-gradient(135deg,#D97706,#B45309)}
+
+  /* ── Arrow connector ── */
+  .connector{
+    display:flex;flex-direction:column;align-items:center;
+    width:68px;flex-shrink:0;opacity:0;transition:opacity 0.4s ease;
+  }
+  .connector.show{opacity:1}
+  .arr-label{font-size:11px;font-weight:700;white-space:nowrap;margin:2px 0;letter-spacing:.02em}
+  .arr-line{position:relative;width:62px;height:14px;margin:1px 0}
+  .arr-line svg{width:100%;height:100%}
+
+  /* ── Expiry row (per-role) ── */
+  .expiry-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+    width:100%;margin-top:24px;
+  }
+  .exp-card{
+    background:#fff;border-radius:14px;padding:16px 12px;
+    text-align:center;box-shadow:0 3px 16px rgba(0,0,0,0.07);
+    opacity:0;transform:translateY(20px);
+    transition:opacity 0.5s ease,transform 0.5s ease;
+  }
+  .exp-card.show{opacity:1;transform:translateY(0)}
+  .exp-title{font-size:13px;font-weight:700;color:#fff;border-radius:8px;padding:4px 8px;margin-bottom:10px}
+  .weeks-row{display:flex;gap:6px;justify-content:center;margin:8px 0}
+  .week-box{
+    width:54px;height:46px;border-radius:8px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;border:2px solid;
+    transition:all 0.6s ease;
+  }
+  .week-num{font-size:15px;font-weight:900}
+  .exp-note{font-size:11px;color:#6B7280;margin-top:6px;line-height:1.4}
+
+  /* ── Info lag section ── */
+  .lag-panel{
+    width:100%;background:#fff;border-radius:20px;
+    padding:24px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.08);
+    opacity:0;transform:translateY(16px);
+    transition:opacity 0.5s ease,transform 0.5s ease;
+    margin-top:20px;
+  }
+  .lag-panel.show{opacity:1;transform:translateY(0)}
+  .lag-chain{display:flex;align-items:center;gap:0;justify-content:center;margin-top:12px}
+  .lag-node{
+    min-width:120px;height:58px;border-radius:10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;color:#fff;padding:0 8px;
+  }
+  .lag-arr{display:flex;flex-direction:column;align-items:center;width:80px}
+  .lag-arr .delay{font-size:11px;font-weight:700;margin:2px 0}
+  .stale-badge{
+    display:inline-block;padding:3px 10px;border-radius:20px;
+    font-size:12px;font-weight:700;margin-top:4px;
+  }
+
+  /* ── Cost cards ── */
+  .cost-row{display:flex;gap:24px;margin-top:24px;justify-content:center}
+  .cost-card{
+    background:#fff;border-radius:18px;padding:24px 20px;
+    text-align:center;width:280px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    border-top:4px solid transparent;
+    opacity:0;transform:translateY(24px) scale(0.96);
+    transition:opacity 0.5s ease,transform 0.5s ease;
+  }
+  .cost-card.show{opacity:1;transform:translateY(0) scale(1)}
+  .cost-icon{font-size:38px;margin-bottom:8px}
+  .cost-label{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF}
+  .cost-val{font-size:38px;font-weight:900;margin:6px 0}
+  .cost-desc{font-size:13px;color:#6B7280;line-height:1.4}
+
+  /* ── Title card ── */
+  .title-wrap{
+    background:linear-gradient(135deg,#3B1A08,#5C2C0E);
+    border-radius:28px;padding:50px 80px;text-align:center;
+    width:100%;box-shadow:0 12px 48px rgba(59,26,8,0.25);
+  }
+  .title-wrap h1{color:#FFF8F0;font-size:72px}
+  .title-wrap .tagline{color:#C26A1A;font-size:22px;margin-top:10px;font-weight:600}
+  .pill-row{display:flex;gap:16px;justify-content:center;margin-top:28px;flex-wrap:wrap}
+  .pill{
+    background:rgba(255,248,240,0.1);border:1.5px solid rgba(255,248,240,0.2);
+    border-radius:10px;padding:10px 18px;color:#FFF8F0;
+    font-size:14px;font-weight:700;letter-spacing:.03em;
+    opacity:0;transform:translateY(10px);
+    transition:opacity 0.4s ease,transform 0.4s ease;
+  }
+  .pill.show{opacity:1;transform:translateY(0)}
+
+  /* ── Animated traveling cake ── */
+  @keyframes travel-right{
+    0%{transform:translateX(0);opacity:0}
+    10%{opacity:1}
+    90%{opacity:1}
+    100%{transform:translateX(var(--travel-dist));opacity:0}
+  }
+  @keyframes travel-left{
+    0%{transform:translateX(0);opacity:0}
+    10%{opacity:1}
+    90%{opacity:1}
+    100%{transform:translateX(var(--travel-dist-neg));opacity:0}
+  }
+  .traveler{
+    position:absolute;font-size:18px;pointer-events:none;
+    animation-timing-function:linear;animation-fill-mode:both;
+  }
+
+  /* ── Chain wrapper for traveler positioning ── */
+  .chain-wrap{position:relative;width:100%}
+</style>
+</head>
+<body>
+
+<div id="overlay" onclick="startVideo()"><div class="btn">▶</div></div>
+<div id="progress" style="width:0"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1  0–8s   Intro: Bakery + four hands                       -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s1">
+  <h1>🎂 Imagine a <span class="amber">Bakery.</span></h1>
+  <p class="sub">Cakes are baked, packed, shipped, and sold — through <strong>four stages.</strong><br>
+  Each stage is played by a real person on your team.</p>
+
+  <div class="chain" style="margin-top:36px">
+    <div class="role r-mfg" id="r0"><div class="ricon">🏭</div><div class="rlabel">Manufacturer</div></div>
+    <div class="connector" id="c0">
+      <div class="arr-label amber">→ ships →</div>
+      <div class="arr-line"><svg viewBox="0 0 62 14"><line x1="0" y1="7" x2="52" y2="7" stroke="#C26A1A" stroke-width="2.5"/><polygon points="52,3 62,7 52,11" fill="#C26A1A"/></svg></div>
+    </div>
+    <div class="role r-dst" id="r1"><div class="ricon">🚚</div><div class="rlabel">Distributor</div></div>
+    <div class="connector" id="c1">
+      <div class="arr-label amber">→ ships →</div>
+      <div class="arr-line"><svg viewBox="0 0 62 14"><line x1="0" y1="7" x2="52" y2="7" stroke="#C26A1A" stroke-width="2.5"/><polygon points="52,3 62,7 52,11" fill="#C26A1A"/></svg></div>
+    </div>
+    <div class="role r-whl" id="r2"><div class="ricon">🏪</div><div class="rlabel">Wholesaler</div></div>
+    <div class="connector" id="c2">
+      <div class="arr-label amber">→ ships →</div>
+      <div class="arr-line"><svg viewBox="0 0 62 14"><line x1="0" y1="7" x2="52" y2="7" stroke="#C26A1A" stroke-width="2.5"/><polygon points="52,3 62,7 52,11" fill="#C26A1A"/></svg></div>
+    </div>
+    <div class="role r-rtl" id="r3"><div class="ricon">🛒</div><div class="rlabel">Retailer</div></div>
+    <div class="connector" id="c3">
+      <div class="arr-label" style="color:#D97706">→ sells →</div>
+      <div class="arr-line"><svg viewBox="0 0 62 14"><line x1="0" y1="7" x2="52" y2="7" stroke="#D97706" stroke-width="2.5"/><polygon points="52,3 62,7 52,11" fill="#D97706"/></svg></div>
+    </div>
+    <div class="role" style="background:linear-gradient(135deg,#FBBF24,#F59E0B);width:120px" id="r4">
+      <div class="ricon">👤</div><div class="rlabel" style="font-size:14px">Customer</div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:32px;font-size:20px;opacity:0;transition:opacity 0.6s ease" id="s1-hint">
+    Every week, each player decides: <strong>how many cakes to order</strong> from the stage above them.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2  8–22s  Material flow: lead times between stages         -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <h2>🎂 <span class="amber">Material</span> flows <em>downstream</em> — with delay.</h2>
+  <p class="sub">Once you place an order, you don't receive it straight away.<br>
+  Each stage has a <strong>shipping lead time</strong> before cakes arrive.</p>
+
+  <div class="chain" style="margin-top:32px">
+    <!-- Mfg -->
+    <div style="text-align:center">
+      <div class="role r-mfg pop" style="margin:0 auto">
+        <div class="ricon">🏭</div><div class="rlabel">Manufacturer</div>
+      </div>
+      <div style="font-size:12px;color:#7C3AED;font-weight:700;margin-top:6px">Production</div>
+    </div>
+
+    <!-- Arrow Mfg→Dst: 2 weeks -->
+    <div style="display:flex;flex-direction:column;align-items:center;width:90px">
+      <div style="font-size:13px;font-weight:800;color:#C26A1A;background:#FFF0DD;border-radius:8px;padding:3px 10px;white-space:nowrap">⏱ 2 weeks</div>
+      <div style="position:relative;width:80px;height:18px;margin-top:4px">
+        <svg viewBox="0 0 80 18" width="80" height="18">
+          <line x1="0" y1="9" x2="68" y2="9" stroke="#C26A1A" stroke-width="2.5"/>
+          <polygon points="68,5 80,9 68,13" fill="#C26A1A"/>
+        </svg>
+      </div>
+      <div style="font-size:10px;color:#9CA3AF;margin-top:2px">longest step</div>
+    </div>
+
+    <!-- Dst -->
+    <div style="text-align:center">
+      <div class="role r-dst pop" style="margin:0 auto">
+        <div class="ricon">🚚</div><div class="rlabel">Distributor</div>
+      </div>
+      <div style="font-size:12px;color:#2563EB;font-weight:700;margin-top:6px">Transit</div>
+    </div>
+
+    <!-- Arrow Dst→Whl: 1 week -->
+    <div style="display:flex;flex-direction:column;align-items:center;width:80px">
+      <div style="font-size:13px;font-weight:800;color:#C26A1A;background:#FFF0DD;border-radius:8px;padding:3px 10px;white-space:nowrap">⏱ 1 week</div>
+      <div style="position:relative;width:70px;height:18px;margin-top:4px">
+        <svg viewBox="0 0 70 18" width="70" height="18">
+          <line x1="0" y1="9" x2="58" y2="9" stroke="#C26A1A" stroke-width="2.5"/>
+          <polygon points="58,5 70,9 58,13" fill="#C26A1A"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Whl -->
+    <div style="text-align:center">
+      <div class="role r-whl pop" style="margin:0 auto">
+        <div class="ricon">🏪</div><div class="rlabel">Wholesaler</div>
+      </div>
+      <div style="font-size:12px;color:#059669;font-weight:700;margin-top:6px">Storage</div>
+    </div>
+
+    <!-- Arrow Whl→Ret: 1 week -->
+    <div style="display:flex;flex-direction:column;align-items:center;width:80px">
+      <div style="font-size:13px;font-weight:800;color:#C26A1A;background:#FFF0DD;border-radius:8px;padding:3px 10px;white-space:nowrap">⏱ 1 week</div>
+      <div style="position:relative;width:70px;height:18px;margin-top:4px">
+        <svg viewBox="0 0 70 18" width="70" height="18">
+          <line x1="0" y1="9" x2="58" y2="9" stroke="#C26A1A" stroke-width="2.5"/>
+          <polygon points="58,5 70,9 58,13" fill="#C26A1A"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Ret -->
+    <div style="text-align:center">
+      <div class="role r-rtl pop" style="margin:0 auto">
+        <div class="ricon">🛒</div><div class="rlabel">Retailer</div>
+      </div>
+      <div style="font-size:12px;color:#D97706;font-weight:700;margin-top:6px">Shelf</div>
+    </div>
+
+    <!-- Arrow → Customer -->
+    <div style="width:50px;height:2px;background:#D97706;margin-top:-6px;align-self:center"></div>
+    <div class="role" style="background:linear-gradient(135deg,#FBBF24,#F59E0B);width:100px;align-self:center" id="s2-cust">
+      <div class="ricon">👤</div><div class="rlabel" style="font-size:13px">Customer</div>
+    </div>
+  </div>
+
+  <!-- Total lead time callout -->
+  <div id="s2-total" style="margin-top:28px;background:#3B1A08;color:#FFF8F0;border-radius:14px;padding:16px 36px;font-size:20px;font-weight:700;text-align:center;opacity:0;transition:opacity 0.6s ease">
+    🕐 Total material lead time from Manufacturer to Customer: <span style="color:#FBBF24">4+ weeks</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3  22–38s  Perishability: each stage has its own 3-week clock -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <h2>⏰ Every stage has its <span class="amber">own 3-week clock.</span></h2>
+  <p class="sub">Cakes that arrive at a stage expire <strong>3 weeks after they arrive there</strong> — independently at each stage.<br>
+  Order too much? Stock sits. Stock ages. Then it's wasted.</p>
+
+  <div class="expiry-grid" style="margin-top:22px">
+    <!-- Manufacturer -->
+    <div class="exp-card" id="ex0">
+      <div class="exp-title" style="background:#7C3AED">🏭 Manufacturer</div>
+      <div class="weeks-row" id="ex0-weeks">
+        <div class="week-box" style="color:#059669;border-color:#059669;background:#F0FDF4">
+          <div class="week-num">Wk1</div><div>Fresh</div>
+        </div>
+        <div class="week-box" style="color:#D97706;border-color:#D97706;background:#FFFBEB">
+          <div class="week-num">Wk2</div><div>Ageing</div>
+        </div>
+        <div class="week-box" style="color:#DC2626;border-color:#DC2626;background:#FEF2F2">
+          <div class="week-num">Wk3</div><div>Expiring</div>
+        </div>
+      </div>
+      <div class="exp-note">Cakes arrive from production — start their own 3-week timer here</div>
+    </div>
+    <!-- Distributor -->
+    <div class="exp-card" id="ex1">
+      <div class="exp-title" style="background:#2563EB">🚚 Distributor</div>
+      <div class="weeks-row">
+        <div class="week-box" style="color:#059669;border-color:#059669;background:#F0FDF4">
+          <div class="week-num">Wk1</div><div>Fresh</div>
+        </div>
+        <div class="week-box" style="color:#D97706;border-color:#D97706;background:#FFFBEB">
+          <div class="week-num">Wk2</div><div>Ageing</div>
+        </div>
+        <div class="week-box" style="color:#DC2626;border-color:#DC2626;background:#FEF2F2">
+          <div class="week-num">Wk3</div><div>Expiring</div>
+        </div>
+      </div>
+      <div class="exp-note">Timer resets when cakes arrive here from Manufacturer</div>
+    </div>
+    <!-- Wholesaler -->
+    <div class="exp-card" id="ex2">
+      <div class="exp-title" style="background:#059669">🏪 Wholesaler</div>
+      <div class="weeks-row">
+        <div class="week-box" style="color:#059669;border-color:#059669;background:#F0FDF4">
+          <div class="week-num">Wk1</div><div>Fresh</div>
+        </div>
+        <div class="week-box" style="color:#D97706;border-color:#D97706;background:#FFFBEB">
+          <div class="week-num">Wk2</div><div>Ageing</div>
+        </div>
+        <div class="week-box" style="color:#DC2626;border-color:#DC2626;background:#FEF2F2">
+          <div class="week-num">Wk3</div><div>Expiring</div>
+        </div>
+      </div>
+      <div class="exp-note">Timer resets when cakes arrive here from Distributor</div>
+    </div>
+    <!-- Retailer -->
+    <div class="exp-card" id="ex3">
+      <div class="exp-title" style="background:#D97706">🛒 Retailer</div>
+      <div class="weeks-row">
+        <div class="week-box" style="color:#059669;border-color:#059669;background:#F0FDF4">
+          <div class="week-num">Wk1</div><div>Fresh</div>
+        </div>
+        <div class="week-box" style="color:#D97706;border-color:#D97706;background:#FFFBEB">
+          <div class="week-num">Wk2</div><div>Ageing</div>
+        </div>
+        <div class="week-box" style="color:#DC2626;border-color:#DC2626;background:#FEF2F2">
+          <div class="week-num">Wk3</div><div>Expiring</div>
+        </div>
+      </div>
+      <div class="exp-note">Timer resets when cakes arrive here from Wholesaler</div>
+    </div>
+  </div>
+
+  <div id="s3-warn" style="margin-top:20px;text-align:center;opacity:0;transition:opacity 0.6s ease">
+    <span style="font-size:20px;font-weight:700;color:#DC2626">
+      ⚠️ Each stage independently expires stock — wastage cost hits every player who over-orders.
+    </span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4  38–54s  Information lag: orders travel upstream slowly  -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <h2>📋 <span class="purple">Orders</span> travel <em>upstream</em> — but arrive <span class="red">stale.</span></h2>
+  <p class="sub">When demand spikes at the Retailer, they place a larger order.<br>
+  But by the time that signal reaches the Manufacturer — it's already <strong>3+ weeks old.</strong></p>
+
+  <!-- Material flow row -->
+  <div class="lag-panel" id="lag1" style="margin-top:18px">
+    <div style="font-size:13px;font-weight:800;color:#C26A1A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+      🎂 Material Flow &nbsp;(Cakes move downstream →)
+    </div>
+    <div class="lag-chain">
+      <div class="lag-node" style="background:#7C3AED">🏭 Mfg</div>
+      <div class="lag-arr">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#C26A1A" stroke-width="2.5"/><polygon points="68,4 80,8 68,12" fill="#C26A1A"/></svg>
+        <div class="delay amber">+2 weeks</div>
+      </div>
+      <div class="lag-node" style="background:#2563EB">🚚 Dst</div>
+      <div class="lag-arr">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#C26A1A" stroke-width="2.5"/><polygon points="68,4 80,8 68,12" fill="#C26A1A"/></svg>
+        <div class="delay amber">+1 week</div>
+      </div>
+      <div class="lag-node" style="background:#059669">🏪 Whl</div>
+      <div class="lag-arr">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#C26A1A" stroke-width="2.5"/><polygon points="68,4 80,8 68,12" fill="#C26A1A"/></svg>
+        <div class="delay amber">+1 week</div>
+      </div>
+      <div class="lag-node" style="background:#D97706">🛒 Ret</div>
+      <div class="lag-arr">
+        <svg width="70" height="16" viewBox="0 0 70 16"><line x1="0" y1="8" x2="58" y2="8" stroke="#D97706" stroke-width="2"/><polygon points="58,4 70,8 58,12" fill="#D97706"/></svg>
+        <div class="delay" style="color:#D97706">instant</div>
+      </div>
+      <div class="lag-node" style="background:#FBBF24;width:90px">👤 Cust</div>
+    </div>
+  </div>
+
+  <!-- Information flow row -->
+  <div class="lag-panel" id="lag2" style="margin-top:14px">
+    <div style="font-size:13px;font-weight:800;color:#7C3AED;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+      📋 Order / Demand Signal &nbsp;(flows upstream ← each round, accumulates delay)
+    </div>
+    <div class="lag-chain">
+      <div class="lag-node" style="background:#7C3AED;position:relative">
+        🏭 Mfg
+        <div class="stale-badge" style="background:#FEE2E2;color:#DC2626;position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">sees demand 3+ wks later</div>
+      </div>
+      <div class="lag-arr" style="flex-direction:row-reverse;transform:scaleX(-1)">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#7C3AED" stroke-width="2" stroke-dasharray="6 4"/><polygon points="68,4 80,8 68,12" fill="#7C3AED"/></svg>
+        <div class="delay purple" style="transform:scaleX(-1)">+1 wk</div>
+      </div>
+      <div class="lag-node" style="background:#2563EB;position:relative">
+        🚚 Dst
+        <div class="stale-badge" style="background:#EDE9FE;color:#7C3AED;position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">2 wks behind</div>
+      </div>
+      <div class="lag-arr" style="flex-direction:row-reverse;transform:scaleX(-1)">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#7C3AED" stroke-width="2" stroke-dasharray="6 4"/><polygon points="68,4 80,8 68,12" fill="#7C3AED"/></svg>
+        <div class="delay purple" style="transform:scaleX(-1)">+1 wk</div>
+      </div>
+      <div class="lag-node" style="background:#059669;position:relative">
+        🏪 Whl
+        <div class="stale-badge" style="background:#D1FAE5;color:#059669;position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">1 wk behind</div>
+      </div>
+      <div class="lag-arr" style="flex-direction:row-reverse;transform:scaleX(-1)">
+        <svg width="80" height="16" viewBox="0 0 80 16"><line x1="0" y1="8" x2="68" y2="8" stroke="#7C3AED" stroke-width="2" stroke-dasharray="6 4"/><polygon points="68,4 80,8 68,12" fill="#7C3AED"/></svg>
+        <div class="delay purple" style="transform:scaleX(-1)">+1 wk</div>
+      </div>
+      <div class="lag-node" style="background:#D97706;position:relative">
+        🛒 Ret
+        <div class="stale-badge" style="background:#FEF3C7;color:#D97706;position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">sees NOW</div>
+      </div>
+      <div class="lag-arr" style="flex-direction:row-reverse;transform:scaleX(-1)">
+        <svg width="70" height="16" viewBox="0 0 70 16"><line x1="0" y1="8" x2="58" y2="8" stroke="#D97706" stroke-width="1.5" stroke-dasharray="4 3"/><polygon points="58,4 70,8 58,12" fill="#D97706"/></svg>
+        <div class="delay" style="color:#D97706;transform:scaleX(-1)">instant</div>
+      </div>
+      <div class="lag-node" style="background:#FBBF24;width:90px;position:relative">
+        👤 Cust
+        <div class="stale-badge" style="background:#FEF9C3;color:#92400E;position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">buys NOW</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="s4-key" style="margin-top:38px;text-align:center;opacity:0;transition:opacity 0.7s ease;font-size:19px;font-weight:700;color:#3B1A08;line-height:1.5">
+    The Manufacturer is making decisions based on <span class="red">old, distorted information</span>.<br>
+    This causes the classic <span class="amber">Bullwhip Effect</span> — small demand changes create huge swings upstream.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5  54–58s  Cost trade-off                                  -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <h2>Every order is a <span class="amber">trade-off.</span></h2>
+  <p class="sub">You must balance three competing costs — every single round.</p>
+
+  <div class="cost-row">
+    <div class="cost-card" id="cc0" style="border-top-color:#DC2626">
+      <div class="cost-icon">📉</div>
+      <div class="cost-label">Lost Sales</div>
+      <div class="cost-val" style="color:#DC2626">$4 / unit</div>
+      <div class="cost-desc">Order <strong>too little</strong> → you run out → customer walks away → lost sale</div>
+    </div>
+    <div class="cost-card" id="cc1" style="border-top-color:#D97706">
+      <div class="cost-icon">🗑️</div>
+      <div class="cost-label">Wastage</div>
+      <div class="cost-val" style="color:#D97706">$2 / unit</div>
+      <div class="cost-desc">Order <strong>too much</strong> → stock ages past 3 weeks → thrown away</div>
+    </div>
+    <div class="cost-card" id="cc2" style="border-top-color:#059669">
+      <div class="cost-icon">📦</div>
+      <div class="cost-label">Holding</div>
+      <div class="cost-val" style="color:#059669">$0.50 / wk</div>
+      <div class="cost-desc">Any unsold inventory sitting in your stage costs money every round</div>
+    </div>
+  </div>
+
+  <div id="s5-foot" style="margin-top:28px;opacity:0;transition:opacity 0.6s ease;text-align:center;font-size:20px;font-weight:700;color:#3B1A08">
+    You only see <span class="amber">your own stage's inventory</span> — not your teammates'.<br>
+    <span style="color:#DC2626">Can you coordinate without full visibility?</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6  58–62s  Title card                                      -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="title-wrap">
+    <div style="font-size:72px;margin-bottom:8px">🎂</div>
+    <h1>THE CAKE GAME</h1>
+    <div class="tagline">Supply chain. Lead times. Expiry. Bullwhip. Can your team win?</div>
+    <div class="pill-row">
+      <div class="pill" id="p0">20 Rounds</div>
+      <div class="pill" id="p1">4 Roles</div>
+      <div class="pill" id="p2">3-Week Shelf Life (per stage)</div>
+      <div class="pill" id="p3">Real-Time Multiplayer</div>
+      <div class="pill" id="p4">Information Lag Built In</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL_MS = 62000;
+let t0 = null, raf = null, started = false;
+
+// Each slide: [startMs, endMs]
+const SLIDES = [
+  ['s1',  0,    8000],
+  ['s2',  7500, 22000],
+  ['s3', 21500, 38000],
+  ['s4', 37500, 54000],
+  ['s5', 53500, 58000],
+  ['s6', 57500, 62000],
+];
+
+// Timed show/hide triggers: [{t, fn}]
+const EVENTS = [
+  // Slide 1
+  { t: 400,  fn: () => show('r0') },
+  { t: 700,  fn: () => show('c0') },
+  { t: 1000, fn: () => show('r1') },
+  { t: 1300, fn: () => show('c1') },
+  { t: 1600, fn: () => show('r2') },
+  { t: 1900, fn: () => show('c2') },
+  { t: 2200, fn: () => show('r3') },
+  { t: 2500, fn: () => show('c3') },
+  { t: 2800, fn: () => show('r4') },
+  { t: 4500, fn: () => opacity('s1-hint', 1) },
+
+  // Slide 2 — total lead time callout
+  { t: 17500, fn: () => opacity('s2-total', 1) },
+
+  // Slide 3 — exp cards pop
+  { t: 22500, fn: () => show('ex0') },
+  { t: 23200, fn: () => show('ex1') },
+  { t: 23900, fn: () => show('ex2') },
+  { t: 24600, fn: () => show('ex3') },
+  // Pulse the Wk3 expiry boxes red after they've shown
+  { t: 27000, fn: pulseExpiry },
+  { t: 35000, fn: () => opacity('s3-warn', 1) },
+
+  // Slide 4 — lag panels
+  { t: 39000, fn: () => show('lag1') },
+  { t: 42000, fn: () => show('lag2') },
+  { t: 50000, fn: () => opacity('s4-key', 1) },
+
+  // Slide 5 — cost cards
+  { t: 54500, fn: () => show('cc0') },
+  { t: 55000, fn: () => show('cc1') },
+  { t: 55500, fn: () => show('cc2') },
+  { t: 57000, fn: () => opacity('s5-foot', 1) },
+
+  // Slide 6 — pills
+  { t: 58500, fn: () => show('p0') },
+  { t: 58900, fn: () => show('p1') },
+  { t: 59300, fn: () => show('p2') },
+  { t: 59700, fn: () => show('p3') },
+  { t: 60100, fn: () => show('p4') },
+];
+
+function show(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('show', 'pop');
+}
+function opacity(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.style.opacity = val;
+}
+function pulseExpiry() {
+  // Flash the Wk3 boxes to highlight expiry
+  document.querySelectorAll('.week-box:last-child').forEach(b => {
+    b.style.animation = 'pulse-red 1.2s ease 3';
+  });
+}
+
+// Add pulse keyframes
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes pulse-red {
+    0%,100% { background:#FEF2F2; transform:scale(1); }
+    50% { background:#FCA5A5; transform:scale(1.08); }
+  }
+`;
+document.head.appendChild(style);
+
+let evtIdx = 0;
+
+function tick(ts) {
+  if (!t0) t0 = ts;
+  const elapsed = ts - t0;
+
+  // Progress
+  document.getElementById('progress').style.width =
+    Math.min(elapsed / TOTAL_MS * 100, 100) + '%';
+
+  // Slides
+  SLIDES.forEach(([id, s, e]) => {
+    const el = document.getElementById(id);
+    const fade = 600;
+    if (elapsed >= s && elapsed < e) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  });
+
+  // Events
+  while (evtIdx < EVENTS.length && elapsed >= EVENTS[evtIdx].t) {
+    EVENTS[evtIdx].fn();
+    evtIdx++;
+  }
+
+  if (elapsed < TOTAL_MS) raf = requestAnimationFrame(tick);
+}
+
+function startVideo() {
+  if (started) return;
+  started = true;
+  document.getElementById('overlay').style.display = 'none';
+  raf = requestAnimationFrame(tick);
+}
+
+// Auto-start after 1s
+setTimeout(startVideo, 1000);
+</script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { Game, ROLES, ROLE_LABELS, Role, RoleState } from '@/lib/types';
 import { Card } from './ui/Card';
+import { TutorialModal } from './TutorialModal';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ interface GameResultsProps {
 }
 
 export function GameResults({ game, teamName }: GameResultsProps) {
+  const [showTutorial, setShowTutorial] = useState(false);
   const { state, config } = game;
 
   const teamTotal   = ROLES.reduce((s, r) => s + (state.roles[r]?.totalCost ?? 0), 0);
@@ -158,12 +160,19 @@ export function GameResults({ game, teamName }: GameResultsProps) {
 
   return (
     <div className="space-y-6">
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-cake-700">🎂 Game Over</h2>
         {teamName && (
           <p className="text-lg font-semibold text-cake-600 mt-1">🏆 {teamName}</p>
         )}
         <p className="text-gray-500 mt-1">Final results after {config.totalRounds} rounds</p>
+        <button
+          onClick={() => setShowTutorial(true)}
+          className="mt-2 text-sm text-cake-600 hover:text-cake-800 underline underline-offset-2"
+        >
+          📖 Replay Tutorial
+        </button>
       </div>
 
       {/* Team totals */}

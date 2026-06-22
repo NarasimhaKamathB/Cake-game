@@ -9,6 +9,7 @@ import {
 import { RolePanel } from '@/components/RolePanel';
 import { WeeklySummary } from '@/components/WeeklySummary';
 import { GameResults } from '@/components/GameResults';
+import { TutorialModal } from '@/components/TutorialModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -26,6 +27,7 @@ export default function GamePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft]   = useState<number>(30);
+  const [showTutorial, setShowTutorial] = useState(true);
   const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -227,9 +229,20 @@ export default function GamePage() {
 
   if (state.phase === 'lobby' || state.phase === 'onboarding') {
     return (
-      <div className="text-center mt-20 text-gray-400">
-        <p className="text-lg">⏳ Waiting for the facilitator to start the game...</p>
-      </div>
+      <>
+        {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+        <div className="text-center mt-20 space-y-4">
+          <p className="text-lg text-gray-400">⏳ Waiting for the facilitator to start the game...</p>
+          {!showTutorial && (
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="text-sm text-cake-600 hover:text-cake-800 underline underline-offset-2"
+            >
+              📖 Watch the tutorial again
+            </button>
+          )}
+        </div>
+      </>
     );
   }
 
@@ -428,6 +441,7 @@ function SummaryView({
       })();
     }
   }, [countdown, isLastRound, gameId, game.state.currentRound]);
+
 
   return (
     <div className="space-y-6">
