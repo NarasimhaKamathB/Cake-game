@@ -648,4 +648,32 @@ function tick(ts) {
     Math.min(elapsed / TOTAL_MS * 100, 100) + '%';
 
   // Slides
-  SLIDES.forEach(([id, s, e]) => {
+  SLIDES.forEach(([id, s, e]) => {    const el = document.getElementById(id);
+    if (elapsed >= s && elapsed < e) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  });
+
+  // Events
+  while (evtIdx < EVENTS.length && elapsed >= EVENTS[evtIdx].t) {
+    EVENTS[evtIdx].fn();
+    evtIdx++;
+  }
+
+  if (elapsed < TOTAL_MS) raf = requestAnimationFrame(tick);
+}
+
+function startVideo() {
+  if (started) return;
+  started = true;
+  document.getElementById('overlay').style.display = 'none';
+  raf = requestAnimationFrame(tick);
+}
+
+// Auto-start after 1s
+setTimeout(startVideo, 1000);
+</script>
+</body>
+</html>
