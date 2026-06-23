@@ -30,18 +30,20 @@ export function TutorialModal({ onClose }: TutorialModalProps) {
       onClick={e => { if (e.target === overlayRef.current) onClose(); }}
     >
       {/* Header bar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-[#3B1A08] shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 sm:px-5 sm:py-3 bg-[#3B1A08] shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🎂</span>
-          <span className="text-[#FFF8F0] font-bold text-sm tracking-wide">
-            THE CAKE GAME — How to Play (62s)
+          <span className="text-lg">🎂</span>
+          <span className="text-[#FFF8F0] font-bold text-xs sm:text-sm tracking-wide">
+            <span className="sm:hidden">How to Play</span>
+            <span className="hidden sm:inline">THE CAKE GAME — How to Play (62s)</span>
           </span>
         </div>
         <button
           onClick={onClose}
-          className="text-[#C26A1A] hover:text-[#FFF8F0] font-bold text-sm px-4 py-1.5 rounded-lg border border-[#C26A1A] hover:bg-[#C26A1A] transition-colors"
+          className="text-[#C26A1A] hover:text-[#FFF8F0] font-bold text-xs sm:text-sm px-3 py-1 sm:px-4 sm:py-1.5 rounded-lg border border-[#C26A1A] hover:bg-[#C26A1A] transition-colors whitespace-nowrap"
         >
-          Got it, I'm ready ✓
+          <span className="sm:hidden">Got it ✓</span>
+          <span className="hidden sm:inline">Got it, I'm ready ✓</span>
         </button>
       </div>
 

@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Cake Game — 60s Teaser</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
+  html{width:100%;height:100%;overflow:hidden;background:#FFF8F0}
   body{
     width:1280px;height:720px;overflow:hidden;
     background:#FFF8F0;
     font-family:'Inter',system-ui,sans-serif;
     user-select:none;
+    transform-origin:top left;
+    position:absolute;
   }
 
   /* ── Progress bar ── */
@@ -181,6 +185,18 @@
   /* ── Chain wrapper for traveler positioning ── */
   .chain-wrap{position:relative;width:100%}
 </style>
+<script>
+  function scaleToFit() {
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    var left = (window.innerWidth  - 1280 * s) / 2;
+    var top  = (window.innerHeight - 720  * s) / 2;
+    document.body.style.transform = 'scale(' + s + ')';
+    document.body.style.left = left + 'px';
+    document.body.style.top  = top  + 'px';
+  }
+  window.addEventListener('resize', scaleToFit);
+  document.addEventListener('DOMContentLoaded', scaleToFit);
+</script>
 </head>
 <body>
 
@@ -633,33 +649,3 @@ function tick(ts) {
 
   // Slides
   SLIDES.forEach(([id, s, e]) => {
-    const el = document.getElementById(id);
-    const fade = 600;
-    if (elapsed >= s && elapsed < e) {
-      el.classList.add('active');
-    } else {
-      el.classList.remove('active');
-    }
-  });
-
-  // Events
-  while (evtIdx < EVENTS.length && elapsed >= EVENTS[evtIdx].t) {
-    EVENTS[evtIdx].fn();
-    evtIdx++;
-  }
-
-  if (elapsed < TOTAL_MS) raf = requestAnimationFrame(tick);
-}
-
-function startVideo() {
-  if (started) return;
-  started = true;
-  document.getElementById('overlay').style.display = 'none';
-  raf = requestAnimationFrame(tick);
-}
-
-// Auto-start after 1s
-setTimeout(startVideo, 1000);
-</script>
-</body>
-</html>
