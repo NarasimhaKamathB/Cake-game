@@ -35,6 +35,30 @@
     font-size:44px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.3);
   }
 
+  /* ── Pause button ── */
+  #pause-btn{
+    position:absolute;bottom:14px;right:16px;z-index:997;
+    background:rgba(59,26,8,0.5);border:1.5px solid rgba(255,255,255,0.2);
+    color:#FFF8F0;font-size:13px;font-weight:700;
+    padding:6px 14px;border-radius:20px;cursor:pointer;
+    display:none;align-items:center;gap:6px;
+    transition:background 0.15s ease;
+  }
+  #pause-btn:hover{background:rgba(59,26,8,0.8)}
+  #pause-icon{font-size:14px}
+
+  /* ── Paused overlay ── */
+  #pause-overlay{
+    position:absolute;inset:0;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(59,26,8,0.45);z-index:996;cursor:pointer;
+  }
+  #pause-overlay .resume-btn{
+    width:90px;height:90px;border-radius:50%;
+    background:#C26A1A;display:flex;align-items:center;justify-content:center;
+    font-size:36px;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,0.3);
+  }
+
   /* ── Slides ── */
   .slide{
     position:absolute;inset:0;opacity:0;pointer-events:none;
@@ -201,6 +225,15 @@
 <body>
 
 <div id="overlay" onclick="startVideo()"><div class="btn">▶</div></div>
+<div id="pause-overlay" onclick="togglePause()">
+  <div class="resume-btn">▶</div>
+</div>
+
+<div id="pause-btn" onclick="togglePause()">
+  <span id="pause-icon">⏸</span>
+  <span id="pause-text">Pause</span>
+</div>
+
 <div id="progress" style="width:0"></div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -556,6 +589,7 @@
 <script>
 const TOTAL_MS = 62000;
 let t0 = null, raf = null, started = false;
+let paused = false, pauseStart = null, totalPaused = 0;
 
 // Each slide: [startMs, endMs]
 const SLIDES = [
@@ -641,7 +675,7 @@ let evtIdx = 0;
 
 function tick(ts) {
   if (!t0) t0 = ts;
-  const elapsed = ts - t0;
+  const elapsed = ts - t0 - totalPaused;
 
   // Progress
   document.getElementById('progress').style.width =
@@ -669,7 +703,26 @@ function startVideo() {
   if (started) return;
   started = true;
   document.getElementById('overlay').style.display = 'none';
+  document.getElementById('pause-btn').style.display = 'flex';
   raf = requestAnimationFrame(tick);
+}
+
+function togglePause() {
+  if (!started) return;
+  paused = !paused;
+  if (paused) {
+    pauseStart = performance.now();
+    document.getElementById('pause-overlay').style.display = 'flex';
+    document.getElementById('pause-icon').textContent = '▶';
+    document.getElementById('pause-text').textContent = 'Resume';
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+  } else {
+    totalPaused += performance.now() - pauseStart;
+    document.getElementById('pause-overlay').style.display = 'none';
+    document.getElementById('pause-icon').textContent = '⏸';
+    document.getElementById('pause-text').textContent = 'Pause';
+    raf = requestAnimationFrame(tick);
+  }
 }
 
 // Auto-start after 1s
