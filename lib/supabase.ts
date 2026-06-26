@@ -10,7 +10,7 @@ import {
   ROLES,
   ROLE_LABELS,
 } from './types';
-import { generateGameCode, createInitialGameState } from './gameLogic';
+import { generateGameCode, createInitialGameState, processRound } from './gameLogic';
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
@@ -247,6 +247,55 @@ export async function startAllGames(): Promise<void> {
       await updateGameState(g.id, { phase: 'ordering', roundStartedAt });
     }),
   );
+}
+
+/**
+ * Watchdog: if all players have not submitted by the time the order timer expires,
+ * submit bot orders (using incomingOrder as fallback) and advance the round.
+ * Safe to call repeatedly — exits early if timer has not elapsed or round is already done.
+ */
+export async function submitBotOrdersAndProcess(gameId: string): Promise<void> {
+  const game = await getGame(gameId);
+  if (!game) return;
+  const { state, config } = game;
+  if (state.phase !== 'ordering') return;
+  if (state.paused) return;
+  const elapsed = Date.now() - (state.roundStartedAt ?? 0);
+  const timerMs = (config.orderTimerSeconds ?? 30) * 1000;
+  if (elapsed < timerMs) return;
+
+  // Check if all roles already submitted (nothing to do)
+  const playersDone = (state.playersDoneOrdering ?? []) as Role[];
+  if (ROLES.every(r => playersDone.includes(r))) return;
+
+  // Build final orders: use submitted value if available, else incomingOrder fallback
+  const storedOrders = ((state as unknown as Record<string, unknown>).pendingOrders ?? {}) as Partial<Record<Role, number>>;
+  const finalOrders: Record<Role, number> = {} as Record<Role, number>;
+  for (const role of ROLES) {
+    finalOrders[role] = storedOrders[role] !== undefined
+      ? storedOrders[role]!
+      : (state.roles[role]?.incomingOrder ?? 0);
+  }
+
+  const newState = processRound(state, config, finalOrders);
+  delete (newState as unknown as Record<string, unknown>).pendingOrders;
+  if (newState.phase === 'ordering') newState.roundStartedAt = Date.now();
+  await updateFullGameState(gameId, newState);
+}
+
+/**
+ * Watchdog: advance a game stuck in summary phase to the next ordering phase.
+ * The admin watchdog calls this after a fixed hold time (e.g. 14 s).
+ */
+export async function advanceFromSummary(gameId: string): Promise<void> {
+  const game = await getGame(gameId);
+  if (!game) return;
+  if (game.state.phase !== 'summary') return;
+  await updateGameState(gameId, {
+    phase: 'ordering',
+    roundStartedAt: Date.now(),
+    playersDoneOrdering: [],
+  });
 }
 
 export async function deleteAllGames(): Promise<void> {

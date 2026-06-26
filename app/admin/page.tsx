@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getAllGames,
   subscribeToAllGames,
@@ -9,6 +9,8 @@ import {
   deleteAllGames,
   resetGameValues,
   updateGameState,
+  submitBotOrdersAndProcess,
+  advanceFromSummary,
 } from '@/lib/supabase';
 import { Game, GameConfig, ROLES, ROLE_LABELS, SessionSettings, Role, DEFAULT_CONFIG } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
@@ -279,16 +281,59 @@ function Leaderboard({ games }: { games: Game[] }) {
 
 // ─── Admin Page ───────────────────────────────────────────────────────────────
 
+// How long to hold on the summary screen before auto-advancing (ms)
+const SUMMARY_HOLD_MS = 14_000;
+
 export default function AdminPage() {
   const [games, setGames]     = useState<Game[]>([]);
   const [session, setSession] = useState<SessionSettings>({ registrationOpen: true });
   const [loading, setLoading] = useState(false);
+  const [watchdogActive, setWatchdogActive] = useState(false);
+
+  // Track when each game first entered 'summary' phase so we can advance after SUMMARY_HOLD_MS
+  const summarySeenAt = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     getAllGames().then(setGames);
     const unsubGames   = subscribeToAllGames(setGames);
     const unsubSession = subscribeToSessionSettings(setSession);
     return () => { unsubGames(); unsubSession(); };
+  }, []);
+
+  // ── Watchdog: auto-advance games when timer expires or summary times out ──
+  const gamesRef = useRef<Game[]>(games);
+  useEffect(() => { gamesRef.current = games; }, [games]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const activeGames = gamesRef.current.filter(
+        g => g.state?.phase === 'ordering' || g.state?.phase === 'summary',
+      );
+      if (activeGames.length === 0) { setWatchdogActive(false); return; }
+      setWatchdogActive(true);
+
+      for (const game of activeGames) {
+        try {
+          if (game.state.phase === 'ordering') {
+            await submitBotOrdersAndProcess(game.id);
+          } else if (game.state.phase === 'summary') {
+            // Record first time we saw this game in summary
+            if (!summarySeenAt.current.has(game.id)) {
+              summarySeenAt.current.set(game.id, Date.now());
+            }
+            const seenAt = summarySeenAt.current.get(game.id)!;
+            if (Date.now() - seenAt >= SUMMARY_HOLD_MS) {
+              summarySeenAt.current.delete(game.id);
+              await advanceFromSummary(game.id);
+            }
+          }
+        } catch {
+          // Ignore per-game errors; try again next tick
+        }
+      }
+    }, 5_000);
+
+    return () => clearInterval(interval);
   }, []);
 
   async function handleToggleRegistration() {
@@ -319,7 +364,15 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-cake-700">🎛️ Admin Panel</h2>
-          <p className="text-sm text-gray-500">Manage game sessions</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-sm text-gray-500">Manage game sessions</p>
+            {watchdogActive && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                Watchdog active
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={handleToggleRegistration}>
