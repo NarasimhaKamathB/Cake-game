@@ -189,6 +189,8 @@ finalOrders[role] = storedOrders[role] !== undefined
 | **Windows mount truncation** | Python/bash writes to files >~100 lines can silently truncate. Always verify line count after write. Use `git show HEAD:path` to recover missing tail. |
 | **CSS transform + position:fixed** | Fixed elements inside CSS-transformed parent break — use `position:absolute` instead. |
 | **Supabase Realtime** | Use `submittedRoundRef` to track submitted round; reset `submitted` state only when round number changes, not on every peer update. |
+| **Watchdog polling** | Watchdog uses `getAllGames()` direct DB fetch each tick — NOT `gamesRef` (Realtime). Realtime can drop events on mobile disconnect; polling is reliable. |
+| **Order input as string** | `orderStr` is stored as `string` state, not `number`. `parseInt(orderStr) \|\| 0` at submit. Allows the user to fully clear the field. Input uses `type="text" inputMode="numeric"`. |
 | **Git push** | From PowerShell only — bash git commands fail on Windows mount. If `index.lock` error: `Remove-Item .git\index.lock -Force` |
 | **Vercel TS** | Stricter than local `tsc`; let Vercel build be source of truth for type errors. |
 | **GitHub repo** | Must remain **public** for Vercel Hobby plan to auto-deploy (private repo blocks non-owner deploys). |
@@ -197,16 +199,16 @@ finalOrders[role] = storedOrders[role] !== undefined
 
 ## Confirmed working (verified June 2026)
 
-All features below were tested and confirmed working by the user at end of Session 3:
-
 | Feature | Status |
 |---------|--------|
 | Tutorial plays correctly on mobile | ✅ Confirmed |
 | Tutorial pause/resume button | ✅ Confirmed |
 | Vercel auto-deploy on push to master | ✅ Confirmed (repo is public) |
-| Admin watchdog auto-advances games when all browser tabs close | ✅ Confirmed — game ran 20 rounds to completion with tab inactive but computer on |
+| Admin watchdog auto-advances games when all browser tabs close | ✅ Confirmed — game ran 20 rounds unattended with admin tab open |
+| Game continues when mobile browser is closed mid-game | ✅ Confirmed after watchdog fix |
+| Order input: can clear/edit the zero | ✅ Confirmed after input fix |
 
-> **Note on watchdog:** The watchdog runs in the admin browser tab. It does NOT need the player tabs to be open — just the admin page. The game ran all 20 rounds unattended, confirming bots correctly fill in missing orders each round and summary phases auto-advance after 14 seconds.
+> **Note on watchdog:** The watchdog runs in the admin browser tab. It does NOT need player tabs open — just the admin page. Originally the watchdog relied on Supabase Realtime to know which games were active; when a mobile browser disconnected, Realtime could drop events and leave the watchdog blind to that game. Fixed by polling `getAllGames()` directly on each 5-second tick, making the watchdog fully independent of Realtime.
 
 ---
 
@@ -242,6 +244,8 @@ All features below were tested and confirmed working by the user at end of Sessi
 - [x] ~~Verify tutorial plays correctly on mobile~~ ✅ confirmed June 2026
 - [x] ~~Tutorial pause/resume~~ ✅ confirmed June 2026
 - [x] ~~Watchdog auto-completes games when tabs close~~ ✅ confirmed June 2026
+- [x] ~~Game halts when mobile browser closed~~ ✅ fixed — watchdog now polls `getAllGames()` each tick, independent of Realtime
+- [x] ~~Order input: cannot delete zero~~ ✅ fixed — input stores string internally, parses to number on submit
 - [ ] Set `NEXT_PUBLIC_ADMIN_PASSWORD` env var in Vercel dashboard (currently uses fallback `cakegame2024`)
 - [ ] Results export — CSV/Excel per team after game ends
 - [ ] Observer mode — non-players watch all roles live
