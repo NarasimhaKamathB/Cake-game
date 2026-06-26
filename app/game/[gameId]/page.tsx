@@ -23,7 +23,7 @@ export default function GamePage() {
   const [game, setGame]           = useState<Game | null>(null);
   const [myRole, setMyRole]       = useState<Role | null>(null);
   const [myPlayerId, setMyPlayerId] = useState<string>('');
-  const [order, setOrder]         = useState<number>(0);
+  const [orderStr, setOrderStr]   = useState<string>('0');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft]   = useState<number>(30);
@@ -91,8 +91,8 @@ export default function GamePage() {
     // Override with what this player has typed (even if not yet stored)
     const myRoleLocal = sessionStorage.getItem('role') as Role | null;
     if (myRoleLocal && storedOrders[myRoleLocal] === undefined) {
-      setOrder(prev => {
-        finalOrders[myRoleLocal] = prev;
+      setOrderStr(prev => {
+        finalOrders[myRoleLocal] = Math.max(0, parseInt(prev) || 0);
         return prev;
       });
     }
@@ -188,10 +188,11 @@ export default function GamePage() {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const storedOrders = ((freshGame.state as any).pendingOrders ?? {}) as Partial<Record<Role, number>>;
+      const numericOrder = Math.max(0, parseInt(orderStr) || 0);
       const mergedOrders: Record<Role, number> = {
         retailer: 0, wholesaler: 0, distributor: 0, manufacturer: 0,
         ...storedOrders,
-        [myRole]: order,
+        [myRole]: numericOrder,
       };
 
       // Check if all players have now submitted
@@ -221,7 +222,7 @@ export default function GamePage() {
     } finally {
       setSubmitting(false);
     }
-  }, [game, myRole, myPlayerId, order, submitted, gameId]);
+  }, [game, myRole, myPlayerId, orderStr, submitted, gameId]);
 
   // ── Loading / lobby states ──────────────────────────────────────────────────
   if (!game) {
@@ -387,11 +388,14 @@ export default function GamePage() {
           </p>
           <div className="flex items-center gap-3">
             <input
-              type="number"
-              min={0}
-              max={999}
-              value={order}
-              onChange={e => setOrder(Math.max(0, parseInt(e.target.value) || 0))}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={orderStr}
+              onChange={e => {
+                const v = e.target.value.replace(/[^0-9]/g, '');
+                setOrderStr(v);
+              }}
               className="w-28 border border-cake-300 rounded-lg px-3 py-2 text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-cake-400"
             />
             <span className="text-sm text-gray-500">units to order from upstream</span>

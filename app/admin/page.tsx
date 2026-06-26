@@ -301,35 +301,39 @@ export default function AdminPage() {
   }, []);
 
   // ── Watchdog: auto-advance games when timer expires or summary times out ──
-  const gamesRef = useRef<Game[]>(games);
-  useEffect(() => { gamesRef.current = games; }, [games]);
-
+  // Uses a direct getAllGames() fetch each tick so it is independent of Realtime
+  // subscription state — works even if the mobile player's disconnect caused
+  // Supabase to drop an event before the admin tab received it.
   useEffect(() => {
     const interval = setInterval(async () => {
-      const activeGames = gamesRef.current.filter(
-        g => g.state?.phase === 'ordering' || g.state?.phase === 'summary',
-      );
-      if (activeGames.length === 0) { setWatchdogActive(false); return; }
-      setWatchdogActive(true);
+      try {
+        const allGames = await getAllGames();
+        const activeGames = allGames.filter(
+          g => g.state?.phase === 'ordering' || g.state?.phase === 'summary',
+        );
+        setWatchdogActive(activeGames.length > 0);
 
-      for (const game of activeGames) {
-        try {
-          if (game.state.phase === 'ordering') {
-            await submitBotOrdersAndProcess(game.id);
-          } else if (game.state.phase === 'summary') {
-            // Record first time we saw this game in summary
-            if (!summarySeenAt.current.has(game.id)) {
-              summarySeenAt.current.set(game.id, Date.now());
+        for (const game of activeGames) {
+          try {
+            if (game.state.phase === 'ordering') {
+              await submitBotOrdersAndProcess(game.id);
+            } else if (game.state.phase === 'summary') {
+              // Record first time we saw this game in summary
+              if (!summarySeenAt.current.has(game.id)) {
+                summarySeenAt.current.set(game.id, Date.now());
+              }
+              const seenAt = summarySeenAt.current.get(game.id)!;
+              if (Date.now() - seenAt >= SUMMARY_HOLD_MS) {
+                summarySeenAt.current.delete(game.id);
+                await advanceFromSummary(game.id);
+              }
             }
-            const seenAt = summarySeenAt.current.get(game.id)!;
-            if (Date.now() - seenAt >= SUMMARY_HOLD_MS) {
-              summarySeenAt.current.delete(game.id);
-              await advanceFromSummary(game.id);
-            }
+          } catch {
+            // Ignore per-game errors; retry next tick
           }
-        } catch {
-          // Ignore per-game errors; try again next tick
         }
+      } catch {
+        // Ignore fetch errors; retry next tick
       }
     }, 5_000);
 
